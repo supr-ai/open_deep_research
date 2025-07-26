@@ -54,7 +54,6 @@ async def clarify_with_user(state: AgentState, config: RunnableConfig) -> Comman
         "model": configurable.research_model,
         "max_tokens": configurable.research_model_max_tokens,
         "api_key": get_api_key_for_model(configurable.research_model, config),
-        "tags": ["langsmith:nostream"]
     }
     model = configurable_model.with_structured_output(ClarifyWithUser).with_retry(stop_after_attempt=configurable.max_structured_output_retries).with_config(model_config)
     response = await model.ainvoke([HumanMessage(content=clarify_with_user_instructions.format(messages=get_buffer_string(messages), date=get_today_str()))])
@@ -70,7 +69,6 @@ async def write_research_brief(state: AgentState, config: RunnableConfig)-> Comm
         "model": configurable.research_model,
         "max_tokens": configurable.research_model_max_tokens,
         "api_key": get_api_key_for_model(configurable.research_model, config),
-        "tags": ["langsmith:nostream"]
     }
     research_model = configurable_model.with_structured_output(ResearchQuestion).with_retry(stop_after_attempt=configurable.max_structured_output_retries).with_config(research_model_config)
     response = await research_model.ainvoke([HumanMessage(content=transform_messages_into_research_topic_prompt.format(
@@ -101,7 +99,6 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
         "model": configurable.research_model,
         "max_tokens": configurable.research_model_max_tokens,
         "api_key": get_api_key_for_model(configurable.research_model, config),
-        "tags": ["langsmith:nostream"]
     }
     lead_researcher_tools = [ConductResearch, ResearchComplete]
     research_model = configurable_model.bind_tools(lead_researcher_tools).with_retry(stop_after_attempt=configurable.max_structured_output_retries).with_config(research_model_config)
@@ -202,7 +199,6 @@ async def researcher(state: ResearcherState, config: RunnableConfig) -> Command[
         "model": configurable.research_model,
         "max_tokens": configurable.research_model_max_tokens,
         "api_key": get_api_key_for_model(configurable.research_model, config),
-        "tags": ["langsmith:nostream"]
     }
     researcher_system_prompt = research_system_prompt.format(mcp_prompt=configurable.mcp_prompt or "", date=get_today_str())
     research_model = configurable_model.bind_tools(tools).with_retry(stop_after_attempt=configurable.max_structured_output_retries).with_config(research_model_config)
@@ -268,7 +264,6 @@ async def compress_research(state: ResearcherState, config: RunnableConfig):
         "model": configurable.compression_model,
         "max_tokens": configurable.compression_model_max_tokens,
         "api_key": get_api_key_for_model(configurable.compression_model, config),
-        "tags": ["langsmith:nostream"]
     })
     researcher_messages = state.get("researcher_messages", [])
     # Update the system prompt to now focus on compression rather than research.

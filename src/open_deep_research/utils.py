@@ -65,8 +65,7 @@ async def tavily_search(
     summarization_model = init_chat_model(
         model=configurable.summarization_model,
         max_tokens=configurable.summarization_model_max_tokens,
-        api_key=model_api_key,
-        tags=["langsmith:nostream"]
+        api_key=model_api_key
     ).with_structured_output(Summary).with_retry(stop_after_attempt=configurable.max_structured_output_retries)
     async def noop():
         return None
