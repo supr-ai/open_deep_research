@@ -28,21 +28,8 @@ ruff check --fix .
 
 # Run type checking with mypy
 mypy src/
-
-# Run tests
-pytest tests/
 ```
 
-### Evaluation
-
-```bash
-# Run comprehensive evaluation on LangSmith datasets
-python tests/run_evaluate.py
-
-# Run legacy test for specific agent
-python src/legacy/tests/run_test.py --agent multi_agent
-python src/legacy/tests/run_test.py --agent graph
-```
 
 ## Architecture Overview
 
@@ -88,9 +75,6 @@ Two alternative approaches with different trade-offs:
 -   **graph.py**: Plan-and-execute workflow with human-in-the-loop
 -   **multi_agent.py**: Original supervisor-researcher multi-agent system
 
-### Security (`src/security/`)
-
--   **auth.py**: Authentication handling for LangGraph deployment
 
 ## Important Considerations
 
@@ -105,13 +89,6 @@ Two alternative approaches with different trade-offs:
     - Copy `.env.example` to `.env` for configuration
     - API keys are dynamically retrieved based on model provider
 
-3. **Testing**:
-
-    - Comprehensive evaluation system in `tests/` directory
-    - 9 quality criteria for report evaluation
-    - LangSmith integration for tracking results
-
-4. **LangGraph Configuration**:
+3. **LangGraph Configuration**:
     - Configuration in `langgraph.json`
     - Python 3.11 requirement
-    - Custom authentication path specified
