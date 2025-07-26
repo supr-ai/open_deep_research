@@ -1,17 +1,14 @@
 import os
-import aiohttp
 import asyncio
-import logging
 import warnings
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, List, Literal, Dict, Optional, Any
+from datetime import datetime
+from typing import Annotated, List, Literal
 from langchain_core.tools import BaseTool, StructuredTool, tool, ToolException, InjectedToolArg
 from langchain_core.messages import HumanMessage, AIMessage, MessageLikeRepresentation, filter_messages
 from langchain_core.runnables import RunnableConfig
 from langchain_core.language_models import BaseChatModel
 from langchain.chat_models import init_chat_model
 from tavily import AsyncTavilyClient
-from langgraph.config import get_store
 from mcp import McpError
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from open_deep_research.state import Summary, ResearchComplete
@@ -122,81 +119,6 @@ async def summarize_webpage(model: BaseChatModel, webpage_content: str) -> str:
 ##########################
 # MCP Utils
 ##########################
-async def get_mcp_access_token(
-    supabase_token: str,
-    base_mcp_url: str,
-) -> Optional[Dict[str, Any]]:
-    try:
-        form_data = {
-            "client_id": "mcp_default",
-            "subject_token": supabase_token,
-            "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
-            "resource": base_mcp_url.rstrip("/") + "/mcp",
-            "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
-        }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                base_mcp_url.rstrip("/") + "/oauth/token",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                data=form_data,
-            ) as token_response:
-                if token_response.status == 200:
-                    token_data = await token_response.json()
-                    return token_data
-                else:
-                    response_text = await token_response.text()
-                    logging.error(f"Token exchange failed: {response_text}")
-    except Exception as e:
-        logging.error(f"Error during token exchange: {e}")
-    return None
-
-async def get_tokens(config: RunnableConfig):
-    store = get_store()
-    thread_id = config.get("configurable", {}).get("thread_id")
-    if not thread_id:
-        return None
-    user_id = config.get("metadata", {}).get("owner")
-    if not user_id:
-        return None
-    tokens = await store.aget((user_id, "tokens"), "data")
-    if not tokens:
-        return None
-    expires_in = tokens.value.get("expires_in")  # seconds until expiration
-    created_at = tokens.created_at  # datetime of token creation
-    current_time = datetime.now(timezone.utc)
-    expiration_time = created_at + timedelta(seconds=expires_in)
-    if current_time > expiration_time:
-        await store.adelete((user_id, "tokens"), "data")
-        return None
-
-    return tokens.value
-
-async def set_tokens(config: RunnableConfig, tokens: dict[str, Any]):
-    store = get_store()
-    thread_id = config.get("configurable", {}).get("thread_id")
-    if not thread_id:
-        return
-    user_id = config.get("metadata", {}).get("owner")
-    if not user_id:
-        return
-    await store.aput((user_id, "tokens"), "data", tokens)
-    return
-
-async def fetch_tokens(config: RunnableConfig) -> dict[str, Any]:
-    current_tokens = await get_tokens(config)
-    if current_tokens:
-        return current_tokens
-    supabase_token = config.get("configurable", {}).get("x-supabase-access-token")
-    if not supabase_token:
-        return None
-    mcp_config = config.get("configurable", {}).get("mcp_config")
-    if not mcp_config or not mcp_config.get("url"):
-        return None
-    mcp_tokens = await get_mcp_access_token(supabase_token, mcp_config.get("url"))
-
-    await set_tokens(config, mcp_tokens)
-    return mcp_tokens
-
 def wrap_mcp_authenticate_tool(tool: StructuredTool) -> StructuredTool:
     old_coroutine = tool.coroutine
     async def wrapped_mcp_coroutine(**kwargs):
@@ -236,10 +158,7 @@ async def load_mcp_tools(
     existing_tool_names: set[str],
 ) -> list[BaseTool]:
     configurable = Configuration.from_runnable_config(config)
-    if configurable.mcp_config and configurable.mcp_config.auth_required:
-        mcp_tokens = await fetch_tokens(config)
-    else:
-        mcp_tokens = None
+    mcp_tokens = None
     if not (configurable.mcp_config and configurable.mcp_config.url and configurable.mcp_config.tools and (mcp_tokens or not configurable.mcp_config.auth_required)):
         return []
     tools = []
@@ -460,34 +379,14 @@ def get_config_value(value):
         return value.value
 
 def get_api_key_for_model(model_name: str, config: RunnableConfig):
-    should_get_from_config = os.getenv("GET_API_KEYS_FROM_CONFIG", "false")
     model_name = model_name.lower()
-    if should_get_from_config.lower() == "true":
-        api_keys = config.get("configurable", {}).get("apiKeys", {})
-        if not api_keys:
-            return None
-        if model_name.startswith("openai:"):
-            return api_keys.get("OPENAI_API_KEY")
-        elif model_name.startswith("anthropic:"):
-            return api_keys.get("ANTHROPIC_API_KEY")
-        elif model_name.startswith("google"):
-            return api_keys.get("GOOGLE_API_KEY")
-        return None
-    else:
-        if model_name.startswith("openai:"): 
-            return os.getenv("OPENAI_API_KEY")
-        elif model_name.startswith("anthropic:"):
-            return os.getenv("ANTHROPIC_API_KEY")
-        elif model_name.startswith("google"):
-            return os.getenv("GOOGLE_API_KEY")
-        return None
+    if model_name.startswith("openai:"): 
+        return os.getenv("OPENAI_API_KEY")
+    elif model_name.startswith("anthropic:"):
+        return os.getenv("ANTHROPIC_API_KEY")
+    elif model_name.startswith("google"):
+        return os.getenv("GOOGLE_API_KEY")
+    return None
 
 def get_tavily_api_key(config: RunnableConfig):
-    should_get_from_config = os.getenv("GET_API_KEYS_FROM_CONFIG", "false")
-    if should_get_from_config.lower() == "true":
-        api_keys = config.get("configurable", {}).get("apiKeys", {})
-        if not api_keys:
-            return None
-        return api_keys.get("TAVILY_API_KEY")
-    else:
-        return os.getenv("TAVILY_API_KEY")
+    return os.getenv("TAVILY_API_KEY")
