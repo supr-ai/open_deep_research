@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { BaseMessage } from '@langchain/core/messages'
 
 export const ConductResearchSchema = z.object({
 	researchTopic: z
