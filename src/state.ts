@@ -67,37 +67,3 @@ export const reduceOverrideValue = <T>(
 	isOverrideValue(newValue)
 		? newValue.value
 		: [...getOverrideValue(currentValue), ...newValue]
-
-export interface AgentInputState {
-	messages: BaseMessage[]
-}
-
-export interface AgentState {
-	messages: BaseMessage[]
-	supervisorMessages: OverrideValue<BaseMessage[]>
-	researchBrief?: string
-	rawNotes: OverrideValue<string[]>
-	notes: OverrideValue<string[]>
-	finalReport?: string
-}
-
-export interface SupervisorState {
-	supervisorMessages: OverrideValue<BaseMessage[]>
-	researchBrief: string
-	notes: OverrideValue<string[]>
-	researchIterations: number
-	rawNotes: OverrideValue<string[]>
-}
-
-export interface ResearcherState {
-	researcherMessages: BaseMessage[]
-	toolCallIterations: number
-	researchTopic: string
-	compressedResearch?: string
-	rawNotes: OverrideValue<string[]>
-}
-
-export interface ResearcherOutputState {
-	compressedResearch: string
-	rawNotes: OverrideValue<string[]>
-}

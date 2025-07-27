@@ -35,10 +35,7 @@ export const ConfigurationSchema = z.object({
 	compression_model: z.string().default('openai:gpt-4.1-mini'),
 	compression_model_max_tokens: z.number().default(8192),
 	finalReport_model: z.string().default('openai:gpt-4.1'),
-	finalReport_model_max_tokens: z.number().default(10000),
-
-	// Optional fields
-	mcp_prompt: z.string().optional()
+	finalReport_model_max_tokens: z.number().default(10000)
 })
 
 export type ConfigurationType = z.infer<typeof ConfigurationSchema>
@@ -63,9 +60,6 @@ export class Configuration {
 	finalReport_model: string = 'openai:gpt-4.1'
 	finalReport_model_max_tokens: number = 10000
 
-	// Optional fields
-	mcp_prompt?: string
-
 	constructor(config?: Partial<ConfigurationType>) {
 		if (config) {
 			Object.assign(this, config)
@@ -88,8 +82,7 @@ export class Configuration {
 			'compression_model',
 			'compression_model_max_tokens',
 			'finalReport_model',
-			'finalReport_model_max_tokens',
-			'mcp_prompt'
+			'finalReport_model_max_tokens'
 		]
 
 		const values: Record<string, any> = {}
