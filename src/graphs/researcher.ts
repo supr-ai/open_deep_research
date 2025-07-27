@@ -27,23 +27,23 @@ import {
 import { DynamicStructuredTool } from '@langchain/core/tools.js'
 
 const ResearcherAnnotation = Annotation.Root({
-	researcher_messages: Annotation<BaseMessage[]>({
+	researcherMessages: Annotation<BaseMessage[]>({
 		reducer: reduceOverrideValue,
 		default: (): BaseMessage[] => []
 	}),
-	tool_call_iterations: Annotation<number>({
+	toolCallIterations: Annotation<number>({
 		reducer: (_current, update) => update,
 		default: () => 0
 	}),
-	research_topic: Annotation<string>({
+	researchTopic: Annotation<string>({
 		reducer: (_current, update) => update,
 		default: () => ''
 	}),
-	compressed_research: Annotation<string>({
+	compressedResearch: Annotation<string>({
 		reducer: (_current, update) => update,
 		default: () => ''
 	}),
-	raw_notes: Annotation<OverrideValue<string[]>>({
+	rawNotes: Annotation<OverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	})
@@ -54,7 +54,7 @@ const researcher = async (
 	config: RunnableConfig
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
-	const researcherMessages = state.researcher_messages
+	const researcherMessages = state.researcherMessages
 	const tools = await getAllTools()
 
 	const researcherSystemPrompt = researchSystemPrompt({})
@@ -80,8 +80,8 @@ const researcher = async (
 	return new Command({
 		goto: 'researcherTools',
 		update: {
-			researcher_messages: [response],
-			tool_call_iterations: (state.tool_call_iterations || 0) + 1
+			researcherMessages: [response],
+			toolCallIterations: (state.toolCallIterations || 0) + 1
 		}
 	})
 }
@@ -109,7 +109,7 @@ const researcherTools = async (
 	config: RunnableConfig
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
-	const researcherMessages = state.researcher_messages
+	const researcherMessages = state.researcherMessages
 	const mostRecentMessage = researcherMessages[researcherMessages.length - 1]
 
 	if (!isAIMessage(mostRecentMessage)) {
@@ -158,7 +158,7 @@ const researcherTools = async (
 
 	// Late Exit Criteria
 	const exceededToolCallIterations =
-		(state.tool_call_iterations || 0) >= configurable.max_react_tool_calls
+		(state.toolCallIterations || 0) >= configurable.max_react_tool_calls
 	const researchCompleteToolCall = toolCalls.some(
 		toolCall => toolCall.name === 'ResearchComplete'
 	)
@@ -166,13 +166,13 @@ const researcherTools = async (
 	if (exceededToolCallIterations || researchCompleteToolCall) {
 		return new Command({
 			goto: 'compressResearch',
-			update: { researcher_messages: toolOutputs }
+			update: { researcherMessages: toolOutputs }
 		})
 	}
 
 	return new Command({
 		goto: 'researcher',
-		update: { researcher_messages: toolOutputs }
+		update: { researcherMessages: toolOutputs }
 	})
 }
 
@@ -195,7 +195,7 @@ const compressResearch = async (
 			stopAfterAttempt: configurable.max_structured_output_retries
 		})
 
-	let researcherMessages = [...state.researcher_messages]
+	let researcherMessages = [...state.researcherMessages]
 	researcherMessages.push(
 		new HumanMessage({ content: compressResearchSimpleHumanMessage })
 	)
@@ -214,8 +214,8 @@ const compressResearch = async (
 			)
 
 			return {
-				compressed_research: messageContentToString(response.content),
-				raw_notes: {
+				compressedResearch: messageContentToString(response.content),
+				rawNotes: {
 					type: 'override',
 					value: [
 						filteredMessages
@@ -242,9 +242,9 @@ const compressResearch = async (
 	)
 
 	return {
-		compressed_research:
+		compressedResearch:
 			'Error synthesizing research report: Maximum retries exceeded',
-		raw_notes: {
+		rawNotes: {
 			type: 'override',
 			value: [
 				filteredMessages

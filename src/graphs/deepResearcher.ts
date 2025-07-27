@@ -35,15 +35,15 @@ const DeepResearcherAnnotation = Annotation.Root({
 		reducer: reduceOverrideValue,
 		default: (): BaseMessage[] => []
 	}),
-	supervisor_messages: Annotation<OverrideValue<BaseMessage[]>>({
+	supervisorMessages: Annotation<OverrideValue<BaseMessage[]>>({
 		reducer: reduceOverrideValue,
 		default: (): BaseMessage[] => []
 	}),
-	research_brief: Annotation<string>({
+	researchBrief: Annotation<string>({
 		reducer: (_current, update) => update,
 		default: () => ''
 	}),
-	raw_notes: Annotation<OverrideValue<string[]>>({
+	rawNotes: Annotation<OverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	}),
@@ -51,7 +51,7 @@ const DeepResearcherAnnotation = Annotation.Root({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	}),
-	final_report: Annotation<string>({
+	finalReport: Annotation<string>({
 		reducer: (_current, update) => update,
 		default: () => ''
 	})
@@ -63,7 +63,7 @@ const clarifyWithUser = async (
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
 	if (!configurable.allow_clarification) {
-		return new Command({ goto: 'write_research_brief' })
+		return new Command({ goto: 'write_researchBrief' })
 	}
 
 	const messages = state.messages
@@ -95,7 +95,7 @@ const clarifyWithUser = async (
 		})
 	} else {
 		return new Command({
-			goto: 'write_research_brief',
+			goto: 'write_researchBrief',
 			update: {
 				messages: [new AIMessage({ content: response.verification })]
 			}
@@ -132,8 +132,8 @@ const writeResearchBrief = async (
 	return new Command({
 		goto: 'researchSupervisor',
 		update: {
-			research_brief: response.research_brief,
-			supervisor_messages: {
+			researchBrief: response.researchBrief,
+			supervisorMessages: {
 				type: 'override',
 				value: [
 					new SystemMessage({
@@ -142,7 +142,7 @@ const writeResearchBrief = async (
 								configurable.max_concurrent_research_units
 						})
 					}),
-					new HumanMessage({ content: response.research_brief })
+					new HumanMessage({ content: response.researchBrief })
 				]
 			}
 		}
@@ -157,8 +157,8 @@ const generateFinalReport = async (
 	const configurable = Configuration.fromRunnableConfig(config)
 
 	const writerModelConfig = {
-		model: configurable.final_report_model,
-		maxTokens: configurable.final_report_model_max_tokens,
+		model: configurable.finalReport_model,
+		maxTokens: configurable.finalReport_model_max_tokens,
 		apiKey: getApiKeyForModel(configurable.research_model)
 	}
 
@@ -168,7 +168,7 @@ const generateFinalReport = async (
 
 	while (currentRetry <= maxRetries) {
 		const finalReportPrompt = generateFinalReportPrompt({
-			researchBrief: state.research_brief,
+			researchBrief: state.researchBrief,
 			messages: state.messages,
 			findings
 		})
@@ -179,7 +179,7 @@ const generateFinalReport = async (
 				.invoke([new HumanMessage({ content: finalReportPrompt })])
 
 			return {
-				final_report: messageContentToString(finalReport.content),
+				finalReport: messageContentToString(finalReport.content),
 				messages: [finalReport],
 				...clearedState
 			}
@@ -187,15 +187,15 @@ const generateFinalReport = async (
 			if (
 				isTokenLimitExceeded(
 					error as Error,
-					configurable.final_report_model
+					configurable.finalReport_model
 				)
 			) {
 				if (currentRetry === 0) {
 					const modelTokenLimit =
-						MODEL_TOKEN_LIMITS[configurable.final_report_model]
+						MODEL_TOKEN_LIMITS[configurable.finalReport_model]
 					if (!modelTokenLimit) {
 						return {
-							final_report: `Error generating final report: Token limit exceeded, however, we could not determine the model's maximum context length. Please update the model map in deepResearcher/utils.ts with this information. ${error}`,
+							finalReport: `Error generating final report: Token limit exceeded, however, we could not determine the model's maximum context length. Please update the model map in deepResearcher/utils.ts with this information. ${error}`,
 							...clearedState
 						}
 					}
@@ -209,7 +209,7 @@ const generateFinalReport = async (
 				currentRetry += 1
 			} else {
 				return {
-					final_report: `Error generating final report: ${error}`,
+					finalReport: `Error generating final report: ${error}`,
 					...clearedState
 				}
 			}
@@ -217,20 +217,20 @@ const generateFinalReport = async (
 	}
 
 	return {
-		final_report: 'Error generating final report: Maximum retries exceeded',
+		finalReport: 'Error generating final report: Maximum retries exceeded',
 		...clearedState
 	}
 }
 
 const deepResearcherGraph = new StateGraph(DeepResearcherAnnotation)
 	.addNode('clarifyWithUser', clarifyWithUser)
-	.addNode('write_research_brief', writeResearchBrief)
+	.addNode('write_researchBrief', writeResearchBrief)
 	.addNode('researchSupervisor', supervisorGraph)
 	.addNode('generateFinalReport', generateFinalReport)
 	.addEdge(START, 'clarifyWithUser')
-	.addEdge('clarifyWithUser', 'write_research_brief')
+	.addEdge('clarifyWithUser', 'write_researchBrief')
 	.addEdge('clarifyWithUser', END)
-	.addEdge('write_research_brief', 'researchSupervisor')
+	.addEdge('write_researchBrief', 'researchSupervisor')
 	.addEdge('researchSupervisor', 'generateFinalReport')
 	.addEdge('generateFinalReport', END)
 	.compile()

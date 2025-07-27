@@ -25,11 +25,11 @@ import {
 import researcherGraph from './researcher.js'
 
 const SupervisorAnnotation = Annotation.Root({
-	supervisor_messages: Annotation<OverrideValue<BaseMessage[]>>({
+	supervisorMessages: Annotation<OverrideValue<BaseMessage[]>>({
 		reducer: reduceOverrideValue,
 		default: (): BaseMessage[] => []
 	}),
-	research_brief: Annotation<string>({
+	researchBrief: Annotation<string>({
 		reducer: (_current, update) => update,
 		default: () => ''
 	}),
@@ -37,11 +37,11 @@ const SupervisorAnnotation = Annotation.Root({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	}),
-	research_iterations: Annotation<number>({
+	researchIterations: Annotation<number>({
 		reducer: (_current, update) => update,
 		default: () => 0
 	}),
-	raw_notes: Annotation<OverrideValue<string[]>>({
+	rawNotes: Annotation<OverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	})
@@ -66,14 +66,14 @@ const supervisor = async (
 		})
 		.withConfig({ configurable: researchModelConfig })
 
-	const supervisorMessages = getOverrideValue(state.supervisor_messages)
+	const supervisorMessages = getOverrideValue(state.supervisorMessages)
 	const response = await researchModel.invoke(supervisorMessages)
 
 	return new Command({
 		goto: 'supervisorTools',
 		update: {
-			supervisor_messages: [response],
-			research_iterations: (state.research_iterations || 0) + 1
+			supervisorMessages: [response],
+			researchIterations: (state.researchIterations || 0) + 1
 		}
 	})
 }
@@ -83,8 +83,8 @@ const supervisorTools = async (
 	config: RunnableConfig
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
-	const supervisorMessages = getOverrideValue(state.supervisor_messages)
-	const researchIterations = state.research_iterations || 0
+	const supervisorMessages = getOverrideValue(state.supervisorMessages)
+	const researchIterations = state.researchIterations || 0
 	const mostRecentMessage = supervisorMessages[supervisorMessages.length - 1]
 
 	if (!isAIMessage(mostRecentMessage)) {
@@ -106,7 +106,7 @@ const supervisorTools = async (
 			goto: END,
 			update: {
 				notes: getNotesFromToolCalls(supervisorMessages),
-				research_brief: state.research_brief
+				researchBrief: state.researchBrief
 			}
 		})
 	}
@@ -129,14 +129,14 @@ const supervisorTools = async (
 		const researchPromises = conductResearchCalls.map(async toolCall => {
 			return researcherGraph.invoke(
 				{
-					researcher_messages: [
+					researcherMessages: [
 						new HumanMessage({
-							content: toolCall.args.research_topic
+							content: toolCall.args.researchTopic
 						})
 					],
-					research_topic: toolCall.args.research_topic,
-					tool_call_iterations: 0,
-					raw_notes: { type: 'override', value: [] }
+					researchTopic: toolCall.args.researchTopic,
+					toolCallIterations: 0,
+					rawNotes: { type: 'override', value: [] }
 				},
 				config
 			)
@@ -155,7 +155,7 @@ const supervisorTools = async (
 			toolMessages.push(
 				new ToolMessage({
 					content:
-						observation.compressed_research ||
+						observation.compressedResearch ||
 						'Error synthesizing research report: Maximum retries exceeded',
 					name: toolCall.name,
 					tool_call_id: toolCall.id
@@ -180,15 +180,15 @@ const supervisorTools = async (
 
 		const rawNotesConcat = toolResults
 			.map(observation =>
-				getOverrideValue(observation.raw_notes).join('\n')
+				getOverrideValue(observation.rawNotes).join('\n')
 			)
 			.join('\n')
 
 		return new Command({
 			goto: 'supervisor',
 			update: {
-				supervisor_messages: toolMessages,
-				raw_notes: [rawNotesConcat]
+				supervisorMessages: toolMessages,
+				rawNotes: [rawNotesConcat]
 			}
 		})
 	} catch (error) {
@@ -202,7 +202,7 @@ const supervisorTools = async (
 			goto: END,
 			update: {
 				notes: getNotesFromToolCalls(supervisorMessages),
-				research_brief: state.research_brief
+				researchBrief: state.researchBrief
 			}
 		})
 	}

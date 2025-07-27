@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { BaseMessage } from '@langchain/core/messages'
 
 export const ConductResearchSchema = z.object({
-	research_topic: z
+	researchTopic: z
 		.string()
 		.describe(
 			'The topic to research. Should be a single topic, and should be described in high detail (at least a paragraph).'
@@ -38,7 +38,7 @@ export const ClarifyWithUserSchema = z.object({
 export type ClarifyWithUser = z.infer<typeof ClarifyWithUserSchema>
 
 export const ResearchQuestionSchema = z.object({
-	research_brief: z
+	researchBrief: z
 		.string()
 		.describe(
 			'A research question that will be used to guide the research.'
@@ -74,30 +74,30 @@ export interface AgentInputState {
 
 export interface AgentState {
 	messages: BaseMessage[]
-	supervisor_messages: OverrideValue<BaseMessage[]>
-	research_brief?: string
-	raw_notes: OverrideValue<string[]>
+	supervisorMessages: OverrideValue<BaseMessage[]>
+	researchBrief?: string
+	rawNotes: OverrideValue<string[]>
 	notes: OverrideValue<string[]>
-	final_report?: string
+	finalReport?: string
 }
 
 export interface SupervisorState {
-	supervisor_messages: OverrideValue<BaseMessage[]>
-	research_brief: string
+	supervisorMessages: OverrideValue<BaseMessage[]>
+	researchBrief: string
 	notes: OverrideValue<string[]>
-	research_iterations: number
-	raw_notes: OverrideValue<string[]>
+	researchIterations: number
+	rawNotes: OverrideValue<string[]>
 }
 
 export interface ResearcherState {
-	researcher_messages: BaseMessage[]
-	tool_call_iterations: number
-	research_topic: string
-	compressed_research?: string
-	raw_notes: OverrideValue<string[]>
+	researcherMessages: BaseMessage[]
+	toolCallIterations: number
+	researchTopic: string
+	compressedResearch?: string
+	rawNotes: OverrideValue<string[]>
 }
 
 export interface ResearcherOutputState {
-	compressed_research: string
-	raw_notes: OverrideValue<string[]>
+	compressedResearch: string
+	rawNotes: OverrideValue<string[]>
 }

@@ -19,7 +19,7 @@ async function runResearch(query: string, config?: Partial<Configuration>) {
 
 runResearch(process.argv[2])
 	.then(result => {
-		console.log(result.final_report)
+		console.log(result.finalReport)
 	})
 	.catch(error => {
 		console.error(error)

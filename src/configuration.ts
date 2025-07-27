@@ -34,8 +34,8 @@ export const ConfigurationSchema = z.object({
 	research_model_max_tokens: z.number().default(10000),
 	compression_model: z.string().default('openai:gpt-4.1-mini'),
 	compression_model_max_tokens: z.number().default(8192),
-	final_report_model: z.string().default('openai:gpt-4.1'),
-	final_report_model_max_tokens: z.number().default(10000),
+	finalReport_model: z.string().default('openai:gpt-4.1'),
+	finalReport_model_max_tokens: z.number().default(10000),
 
 	// Optional fields
 	mcp_prompt: z.string().optional()
@@ -60,8 +60,8 @@ export class Configuration {
 	research_model_max_tokens: number = 10000
 	compression_model: string = 'openai:gpt-4.1-mini'
 	compression_model_max_tokens: number = 8192
-	final_report_model: string = 'openai:gpt-4.1'
-	final_report_model_max_tokens: number = 10000
+	finalReport_model: string = 'openai:gpt-4.1'
+	finalReport_model_max_tokens: number = 10000
 
 	// Optional fields
 	mcp_prompt?: string
@@ -87,8 +87,8 @@ export class Configuration {
 			'research_model_max_tokens',
 			'compression_model',
 			'compression_model_max_tokens',
-			'final_report_model',
-			'final_report_model_max_tokens',
+			'finalReport_model',
+			'finalReport_model_max_tokens',
 			'mcp_prompt'
 		]
 
@@ -254,7 +254,7 @@ export class Configuration {
 				}
 			}
 		},
-		final_report_model: {
+		finalReport_model: {
 			default: 'openai:gpt-4.1',
 			metadata: {
 				x_oap_ui_config: {
@@ -265,7 +265,7 @@ export class Configuration {
 				}
 			}
 		},
-		final_report_model_max_tokens: {
+		finalReport_model_max_tokens: {
 			default: 10000,
 			metadata: {
 				x_oap_ui_config: {
