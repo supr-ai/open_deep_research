@@ -1,12 +1,8 @@
 {
-	"name": "open_deep_research",
+	"name": "supai-deep-research",
 	"type": "module",
 	"scripts": {
-		"build": "tsc",
-		"start": "node dist/index.js",
-		"dev": "tsx watch src/index.ts",
-		"lint": "eslint src --ext .ts",
-		"format": "prettier --write src/**/*.ts"
+		"start": "dotenv -- tsx src"
 	},
 	"dependencies": {
 		"@langchain/core": "^0.3.66",
