@@ -1,0 +1,366 @@
+import { z } from "zod";
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { 
+  AIMessage, 
+  HumanMessage, 
+  ToolMessage,
+  BaseMessage
+} from "@langchain/core/messages";
+import { RunnableConfig } from "@langchain/core/runnables";
+import { Configuration } from "./configuration.js";
+import { summarizeWebpagePrompt } from "./prompts.js";
+import { Summary, SummarySchema, ResearchCompleteSchema } from "./state.js";
+
+//########################
+// Tavily Search Tool Utils
+//########################
+
+interface TavilySearchResult {
+  title: string;
+  url: string;
+  content: string;
+  raw_content?: string;
+}
+
+interface TavilySearchResponse {
+  query: string;
+  results: TavilySearchResult[];
+}
+
+const TAVILY_SEARCH_DESCRIPTION = 
+  "A search engine optimized for comprehensive, accurate, and trusted results. " +
+  "Useful for when you need to answer questions about current events.";
+
+export async function tavilySearchAsync(
+  searchQueries: string[],
+  maxResults: number = 5,
+  topic: "general" | "news" | "finance" = "general",
+  includeRawContent: boolean = true,
+  config?: RunnableConfig
+): Promise<TavilySearchResponse[]> {
+  const apiKey = getTavilyApiKey(config);
+  
+  const searchTasks = searchQueries.map(async (query): Promise<TavilySearchResponse> => {
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        query,
+        max_results: maxResults,
+        include_raw_content: includeRawContent,
+        topic,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Tavily search failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      query,
+      results: data.results || []
+    };
+  });
+
+  return Promise.all(searchTasks);
+}
+
+export async function summarizeWebpage(model: BaseChatModel, webpageContent: string): Promise<string> {
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Timeout")), 60000);
+    });
+
+    const summaryPromise = model.invoke([
+      new HumanMessage({
+        content: summarizeWebpagePrompt
+          .replace("{webpage_content}", webpageContent)
+          .replace("{date}", getTodayStr())
+      })
+    ]);
+
+    const summary = await Promise.race([summaryPromise, timeoutPromise]);
+    
+    // Assuming the model returns a structured Summary object
+    const summaryData = summary.content as any;
+    return `<summary>\n${summaryData.summary}\n</summary>\n\n<key_excerpts>\n${summaryData.key_excerpts}\n</key_excerpts>`;
+  } catch (error) {
+    console.error(`Failed to summarize webpage: ${error}`);
+    return webpageContent;
+  }
+}
+
+//########################
+// Tool Utils
+//########################
+
+export async function createTavilySearchTool(): Promise<DynamicStructuredTool> {
+  return new DynamicStructuredTool({
+    name: "tavily_search",
+    description: TAVILY_SEARCH_DESCRIPTION,
+    schema: z.object({
+      queries: z.array(z.string()).describe("List of search queries, you can pass in as many queries as you need."),
+      max_results: z.number().default(5).describe("Maximum number of results to return"),
+      topic: z.enum(["general", "news", "finance"]).default("general").describe("Topic to filter results by"),
+    }),
+    func: async (input: { queries: string[]; max_results?: number; topic?: "general" | "news" | "finance" }, runManager, config) => {
+      const { queries, max_results = 5, topic = "general" } = input;
+      
+      const searchResults = await tavilySearchAsync(
+        queries,
+        max_results,
+        topic,
+        true,
+        config
+      );
+
+      // Format the search results and deduplicate results by URL
+      let formattedOutput = "Search results: \n\n";
+      const uniqueResults: Record<string, TavilySearchResult & { query: string }> = {};
+      
+      for (const response of searchResults) {
+        for (const result of response.results) {
+          const url = result.url;
+          if (!(url in uniqueResults)) {
+            uniqueResults[url] = { ...result, query: response.query };
+          }
+        }
+      }
+
+      const configurable = Configuration.fromRunnableConfig(config);
+      const maxCharToInclude = 50_000;
+
+      const summarizedResults: Record<string, { title: string; content: string }> = {};
+      
+      for (const [url, result] of Object.entries(uniqueResults)) {
+        summarizedResults[url] = {
+          title: result.title,
+          content: result.content || result.raw_content?.slice(0, maxCharToInclude) || ""
+        };
+      }
+
+      let i = 0;
+      for (const [url, result] of Object.entries(summarizedResults)) {
+        i++;
+        formattedOutput += `\n\n--- SOURCE ${i}: ${result.title} ---\n`;
+        formattedOutput += `URL: ${url}\n\n`;
+        formattedOutput += `SUMMARY:\n${result.content}\n\n`;
+        formattedOutput += "\n\n" + "-".repeat(80) + "\n";
+      }
+
+      if (Object.keys(summarizedResults).length > 0) {
+        return formattedOutput;
+      } else {
+        return "No valid search results found. Please try different search queries or use a different search API.";
+      }
+    },
+  });
+}
+
+export async function createResearchCompleteTool(): Promise<DynamicStructuredTool> {
+  return new DynamicStructuredTool({
+    name: "ResearchComplete",
+    description: "Call this tool to indicate that the research is complete.",
+    schema: ResearchCompleteSchema,
+    func: async () => "Research completed",
+  });
+}
+
+export async function getAllTools(config: RunnableConfig): Promise<DynamicStructuredTool[]> {
+  const tools: DynamicStructuredTool[] = [];
+  
+  // Add ResearchComplete tool
+  const researchCompleteTool = await createResearchCompleteTool();
+  tools.push(researchCompleteTool);
+  
+  // Add search tools
+  const searchTool = await createTavilySearchTool();
+  tools.push(searchTool);
+  
+  return tools;
+}
+
+export function getNotesFromToolCalls(messages: BaseMessage[]): string[] {
+  return messages
+    .filter((msg): msg is ToolMessage => msg._getType() === "tool")
+    .map(msg => msg.content as string);
+}
+
+//########################
+// Token Limit Exceeded Utils
+//########################
+
+export function isTokenLimitExceeded(exception: Error, modelName?: string): boolean {
+  const errorStr = exception.message.toLowerCase();
+  let provider: string | null = null;
+  
+  if (modelName) {
+    const modelStr = modelName.toLowerCase();
+    if (modelStr.startsWith('openai:')) {
+      provider = 'openai';
+    } else if (modelStr.startsWith('anthropic:')) {
+      provider = 'anthropic';
+    } else if (modelStr.startsWith('gemini:') || modelStr.startsWith('google:')) {
+      provider = 'gemini';
+    }
+  }
+
+  if (provider === 'openai') {
+    return checkOpenAITokenLimit(exception, errorStr);
+  } else if (provider === 'anthropic') {
+    return checkAnthropicTokenLimit(exception, errorStr);
+  } else if (provider === 'gemini') {
+    return checkGeminiTokenLimit(exception, errorStr);
+  }
+  
+  return (
+    checkOpenAITokenLimit(exception, errorStr) ||
+    checkAnthropicTokenLimit(exception, errorStr) ||
+    checkGeminiTokenLimit(exception, errorStr)
+  );
+}
+
+function checkOpenAITokenLimit(exception: Error, errorStr: string): boolean {
+  const exceptionType = exception.constructor.name;
+  const isBadRequest = ['BadRequestError', 'InvalidRequestError'].includes(exceptionType);
+  
+  if (isBadRequest) {
+    const tokenKeywords = ['token', 'context', 'length', 'maximum context', 'reduce'];
+    if (tokenKeywords.some(keyword => errorStr.includes(keyword))) {
+      return true;
+    }
+  }
+
+  // Check for specific error properties
+  const errorObj = exception as any;
+  if (
+    (errorObj.code === 'context_length_exceeded') ||
+    (errorObj.type === 'invalid_request_error')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function checkAnthropicTokenLimit(exception: Error, errorStr: string): boolean {
+  const exceptionType = exception.constructor.name;
+  const isBadRequest = exceptionType === 'BadRequestError';
+  
+  if (isBadRequest && errorStr.includes('prompt is too long')) {
+    return true;
+  }
+
+  return false;
+}
+
+function checkGeminiTokenLimit(exception: Error, errorStr: string): boolean {
+  const exceptionType = exception.constructor.name;
+  const isResourceExhausted = ['ResourceExhausted', 'GoogleGenerativeAIFetchError'].includes(exceptionType);
+  
+  if (isResourceExhausted) {
+    return true;
+  }
+
+  if (errorStr.includes('google.api_core.exceptions.resourceexhausted')) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Model token limits map
+const MODEL_TOKEN_LIMITS: Record<string, number> = {
+  "openai:gpt-4.1-mini": 1047576,
+  "openai:gpt-4.1-nano": 1047576,
+  "openai:gpt-4.1": 1047576,
+  "openai:gpt-4o-mini": 128000,
+  "openai:gpt-4o": 128000,
+  "openai:o4-mini": 200000,
+  "openai:o3-mini": 200000,
+  "openai:o3": 200000,
+  "openai:o3-pro": 200000,
+  "openai:o1": 200000,
+  "openai:o1-pro": 200000,
+  "anthropic:claude-opus-4": 200000,
+  "anthropic:claude-sonnet-4": 200000,
+  "anthropic:claude-3-7-sonnet": 200000,
+  "anthropic:claude-3-5-sonnet": 200000,
+  "anthropic:claude-3-5-haiku": 200000,
+  "google:gemini-1.5-pro": 2097152,
+  "google:gemini-1.5-flash": 1048576,
+  "google:gemini-pro": 32768,
+  "cohere:command-r-plus": 128000,
+  "cohere:command-r": 128000,
+  "cohere:command-light": 4096,
+  "cohere:command": 4096,
+  "mistral:mistral-large": 32768,
+  "mistral:mistral-medium": 32768,
+  "mistral:mistral-small": 32768,
+  "mistral:mistral-7b-instruct": 32768,
+  "ollama:codellama": 16384,
+  "ollama:llama2:70b": 4096,
+  "ollama:llama2:13b": 4096,
+  "ollama:llama2": 4096,
+  "ollama:mistral": 32768,
+};
+
+export function getModelTokenLimit(modelString: string): number | null {
+  for (const [key, tokenLimit] of Object.entries(MODEL_TOKEN_LIMITS)) {
+    if (modelString.includes(key)) {
+      return tokenLimit;
+    }
+  }
+  return null;
+}
+
+export function removeUpToLastAIMessage(messages: BaseMessage[]): BaseMessage[] {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]._getType() === "ai") {
+      return messages.slice(0, i);
+    }
+  }
+  return messages;
+}
+
+//########################
+// Misc Utils
+//########################
+
+export function getTodayStr(): string {
+  const date = new Date();
+  const options: Intl.DateTimeFormatOptions = { 
+    weekday: 'short', 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  };
+  return date.toLocaleDateString('en-US', options);
+}
+
+export function getApiKeyForModel(modelName: string, config?: RunnableConfig): string {
+  const modelStr = modelName.toLowerCase();
+  
+  if (modelStr.startsWith("openai:")) {
+    return process.env.OPENAI_API_KEY || "";
+  } else if (modelStr.startsWith("anthropic:")) {
+    return process.env.ANTHROPIC_API_KEY || "";
+  } else if (modelStr.startsWith("google")) {
+    return process.env.GOOGLE_API_KEY || "";
+  }
+  
+  return "";
+}
+
+export function getTavilyApiKey(config?: RunnableConfig): string {
+  return process.env.TAVILY_API_KEY || "";
+}
+
+export function getBufferString(messages: BaseMessage[]): string {
+  return messages.map(msg => `${msg._getType()}: ${msg.content}`).join('\n');
+} 

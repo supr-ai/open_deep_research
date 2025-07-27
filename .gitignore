@@ -1,69 +1,72 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-*.egg-info
-*.pyc
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
+# Production builds
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+build/
 
-# Virtual environments
-venv/
-env/
-ENV/
+# Environment variables
 .env
-
-# IDE specific files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-.tox/
-
-# Logs
-*.log
-logs/
-
-# Local development
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Dependencies
-node_modules/
+# TypeScript
+*.tsbuildinfo
 
-# LangGraph specific
-.langgraph/
+# Logs
+logs
+*.log
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Temporary files
 tmp/
 temp/
 
-.langgraph_api
+# Lock files (keep one)
+# npm
+package-lock.json
+# yarn
+yarn.lock
+# pnpm
+pnpm-lock.yaml
+
+# Python (in case there are any legacy files)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.env
+
+# LangGraph specific
+.langgraph/
+
+# Documentation
+docs/_build/

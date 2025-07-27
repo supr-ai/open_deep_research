@@ -1,9 +1,9 @@
 {
     "dockerfile_lines": [],
     "graphs": {
-      "Deep Researcher": "./src/open_deep_research/deep_researcher.py:deep_researcher"
+      "Deep Researcher": "./dist/deepResearcher.js:deepResearcher"
     },
-    "python_version": "3.11",
+    "node_version": "18",
     "env": "./.env",
     "dependencies": [
       "."
