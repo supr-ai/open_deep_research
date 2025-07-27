@@ -1,6 +1,5 @@
 import asyncio
 import os
-import warnings
 from datetime import datetime
 from typing import Annotated, List, Literal
 
@@ -14,14 +13,9 @@ from langchain_core.messages import (
 )
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import (
-    BaseTool,
     InjectedToolArg,
-    StructuredTool,
-    ToolException,
     tool,
 )
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from mcp import McpError
 from tavily import AsyncTavilyClient
 
 from open_deep_research.configuration import Configuration
@@ -128,79 +122,6 @@ async def summarize_webpage(model: BaseChatModel, webpage_content: str) -> str:
 
 
 ##########################
-# MCP Utils
-##########################
-def wrap_mcp_authenticate_tool(tool: StructuredTool) -> StructuredTool:
-    old_coroutine = tool.coroutine
-    async def wrapped_mcp_coroutine(**kwargs):
-        def _find_first_mcp_error_nested(exc: BaseException) -> McpError | None:
-            if isinstance(exc, McpError):
-                return exc
-            if isinstance(exc, ExceptionGroup):
-                for sub_exc in exc.exceptions:
-                    if found := _find_first_mcp_error_nested(sub_exc):
-                        return found
-            return None
-        try:
-            return await old_coroutine(**kwargs)
-        except BaseException as e_orig:
-            mcp_error = _find_first_mcp_error_nested(e_orig)
-            if not mcp_error:
-                raise e_orig
-            error_details = mcp_error.error
-            is_interaction_required = getattr(error_details, "code", None) == -32003
-            error_data = getattr(error_details, "data", None) or {}
-            if is_interaction_required:
-                message_payload = error_data.get("message", {})
-                error_message_text = "Required interaction"
-                if isinstance(message_payload, dict):
-                    error_message_text = (
-                        message_payload.get("text") or error_message_text
-                    )
-                if url := error_data.get("url"):
-                    error_message_text = f"{error_message_text} {url}"
-                raise ToolException(error_message_text) from e_orig
-            raise e_orig
-    tool.coroutine = wrapped_mcp_coroutine
-    return tool
-
-async def load_mcp_tools(
-    config: RunnableConfig,
-    existing_tool_names: set[str],
-) -> list[BaseTool]:
-    configurable = Configuration.from_runnable_config(config)
-    mcp_tokens = None
-    if not (configurable.mcp_config and configurable.mcp_config.url and configurable.mcp_config.tools and (mcp_tokens or not configurable.mcp_config.auth_required)):
-        return []
-    tools = []
-    # TODO: When the Multi-MCP Server support is merged in OAP, update this code.
-    server_url = configurable.mcp_config.url.rstrip("/") + "/mcp"
-    mcp_server_config = {
-        "server_1":{
-            "url": server_url,
-            "headers": {"Authorization": f"Bearer {mcp_tokens['access_token']}"} if mcp_tokens else None,
-            "transport": "streamable_http"
-        }
-    }
-    try:
-        client = MultiServerMCPClient(mcp_server_config)
-        mcp_tools = await client.get_tools()
-    except Exception as e:
-        print(f"Error loading MCP tools: {e}")
-        return []
-    for tool in mcp_tools:
-        if tool.name in existing_tool_names:
-            warnings.warn(
-                f"Trying to add MCP tool with a name {tool.name} that is already in use - this tool will be ignored."
-            )
-            continue
-        if tool.name not in set(configurable.mcp_config.tools):
-            continue
-        tools.append(wrap_mcp_authenticate_tool(tool))
-    return tools
-
-
-##########################
 # Tool Utils
 ##########################
 async def get_search_tool():
@@ -211,9 +132,6 @@ async def get_search_tool():
 async def get_all_tools(config: RunnableConfig):
     tools = [tool(ResearchComplete)]
     tools.extend(await get_search_tool())
-    existing_tool_names = {tool.name if hasattr(tool, "name") else tool.get("name", "web_search") for tool in tools}
-    mcp_tools = await load_mcp_tools(config, existing_tool_names)
-    tools.extend(mcp_tools)
     return tools
 
 def get_notes_from_tool_calls(messages: list[MessageLikeRepresentation]):

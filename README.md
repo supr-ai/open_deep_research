@@ -2,7 +2,7 @@
 
 <img width="1388" height="298" alt="full_diagram" src="https://github.com/user-attachments/assets/12a2371b-8be2-4219-9b48-90503eb43c69" />
 
-Deep research has broken out as one of the most popular agent applications. This is a simple, configurable, fully open source deep research agent that works across many model providers, search tools, and MCP servers. 
+Deep research has broken out as one of the most popular agent applications. This is a simple, configurable, fully open source deep research agent that works across many model providers and uses Tavily for web search. 
 
 * Read more in our [blog](https://blog.langchain.com/open-deep-research/) 
 * See our [video](https://www.youtube.com/watch?v=agGiWUpxkhg) for a quick overview
@@ -84,36 +84,6 @@ All models are configured using [init_chat_model() API](https://python.langchain
    - For OpenRouter: Follow [this guide](https://github.com/langchain-ai/open_deep_research/issues/75#issuecomment-2811472408)
    - For local models via Ollama: See [setup instructions](https://github.com/langchain-ai/open_deep_research/issues/65#issuecomment-2743586318)
 
-#### Example MCP (Model Context Protocol) Servers
-
-Open Deep Research supports MCP servers to extend research capabilities. 
-
-#### Local MCP Servers
-
-**Filesystem MCP Server** provides secure file system operations with robust access control:
-- Read, write, and manage files and directories
-- Perform operations like reading file contents, creating directories, moving files, and searching
-- Restrict operations to predefined directories for security
-- Support for both command-line configuration and dynamic MCP roots
-
-Example usage:
-```bash
-mcp-server-filesystem /path/to/allowed/dir1 /path/to/allowed/dir2
-```
-
-#### Remote MCP Servers  
-
-**Remote MCP servers** enable distributed agent coordination and support streamable HTTP requests. Unlike local servers, they can be multi-tenant and require more complex authentication.
-
-**Arcade MCP Server Example**:
-```json
-{
-  "url": "https://api.arcade.dev/v1/mcps/ms_0ujssxh0cECutqzMgbtXSGnjorm",
-  "tools": ["Search_SearchHotels", "Search_SearchOneWayFlights", "Search_SearchRoundtripFlights"]
-}
-```
-
-Remote servers can be configured as authenticated or unauthenticated and support JWT-based authentication through OAuth endpoints.
 
 ### Deployments and Usages
 
@@ -141,6 +111,6 @@ The `src/legacy/` folder contains two earlier implementations that provide alter
 - **Supervisor-Researcher Architecture**: Coordinated multi-agent system
 - **Parallel Processing**: Multiple researchers work simultaneously
 - **Speed Optimized**: Faster report generation through concurrency
-- **MCP Support**: Extensive Model Context Protocol integration
+- **Tavily Search**: Integrated web search for research
 
 See `src/legacy/legacy.md` for detailed documentation, configuration options, and usage examples for both legacy implementations.

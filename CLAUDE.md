@@ -61,7 +61,6 @@ Open Deep Research is a LangGraph-based deep research agent system with multiple
 
     - Supports Tavily search API
     - Tavily search works with all model providers
-    - MCP (Model Context Protocol) server support for extended capabilities
 
 4. **State Management**:
     - Uses LangGraph's StateGraph for workflow orchestration

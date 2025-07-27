@@ -1,26 +1,9 @@
 import os
-from typing import Any, List
+from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field
 
-
-class MCPConfig(BaseModel):
-    url: str | None = Field(
-        default=None,
-        optional=True,
-    )
-    """The URL of the MCP server"""
-    tools: List[str] | None = Field(
-        default=None,
-        optional=True,
-    )
-    """The tools to make available to the LLM"""
-    auth_required: bool | None = Field(
-        default=False,
-        optional=True,
-    )
-    """Whether the MCP server requires authentication"""
 
 class Configuration(BaseModel):
     # General Configuration
@@ -167,28 +150,6 @@ class Configuration(BaseModel):
             }
         }
     )
-    # MCP server configuration
-    mcp_config: MCPConfig | None = Field(
-        default=None,
-        optional=True,
-        metadata={
-            "x_oap_ui_config": {
-                "type": "mcp",
-                "description": "MCP server configuration"
-            }
-        }
-    )
-    mcp_prompt: str | None = Field(
-        default=None,
-        optional=True,
-        metadata={
-            "x_oap_ui_config": {
-                "type": "text",
-                "description": "Any additional instructions to pass along to the Agent regarding the MCP tools that are available to it."
-            }
-        }
-    )
-
 
     @classmethod
     def from_runnable_config(
