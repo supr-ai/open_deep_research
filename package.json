@@ -1,13 +1,6 @@
 {
 	"name": "open_deep_research",
-	"version": "0.0.16",
-	"description": "Planning, research, and report generation.",
-	"author": "Lance Martin",
-	"license": "MIT",
 	"type": "module",
-	"engines": {
-		"node": ">=18.0.0"
-	},
 	"scripts": {
 		"build": "tsc",
 		"start": "node dist/index.js",
@@ -16,32 +9,14 @@
 		"format": "prettier --write src/**/*.ts"
 	},
 	"dependencies": {
-		"@langchain/community": "^0.3.9",
-		"@langchain/openai": "^0.3.7",
-		"@langchain/anthropic": "^0.3.15",
-		"@langchain/groq": "^0.2.4",
-		"@langchain/google-vertexai": "^2.0.25",
-		"@langchain/google-genai": "^2.1.5",
-		"@langchain/core": "^0.3.0",
-		"langgraph": "^0.5.3",
-		"langchain": "^0.3.0",
-		"tavily": "^0.5.0",
-		"openai": "^4.61.0",
-		"axios": "^1.7.0",
-		"cheerio": "^1.0.0",
-		"dotenv": "^16.4.0",
-		"zod": "^3.23.0",
-		"uuid": "^9.0.0",
-		"date-fns": "^3.6.0"
+		"@langchain/core": "^0.3.66",
+		"@langchain/langgraph": "^0.3.11",
+		"dotenv": "^17.2.1",
+		"langchain": "^0.3.30",
+		"zod": "^4.0.10"
 	},
 	"devDependencies": {
-		"@types/node": "^20.0.0",
-		"@types/uuid": "^9.0.0",
-		"@typescript-eslint/eslint-plugin": "^7.0.0",
-		"@typescript-eslint/parser": "^7.0.0",
-		"eslint": "^8.57.0",
-		"prettier": "^3.2.0",
-		"tsx": "^4.7.0",
-		"typescript": "^5.4.0"
+		"@types/node": "^24.1.0",
+		"tsx": "^4.20.3"
 	}
 }
