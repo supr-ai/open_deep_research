@@ -4,10 +4,57 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import {
 	HumanMessage,
 	ToolMessage,
-	BaseMessage
+	BaseMessage,
+	MessageContent
 } from '@langchain/core/messages'
 import { summarizeWebpagePrompt } from './prompts.js'
 import { ResearchCompleteSchema } from './state.js'
+import { initChatModel } from 'langchain/chat_models/universal'
+
+export const configurableModel = initChatModel(undefined, {
+	configurableFields: ['model', 'maxTokens', 'apiKey']
+})
+
+export const messageContentToString = (content: MessageContent) => {
+	// If it’s already a string, just return it
+	if (typeof content === 'string') {
+		return content
+	}
+
+	// Otherwise it’s an array of “complex” items
+	return content
+		.map<string>(part => {
+			// strings inside the array
+			if (typeof part === 'string') {
+				return part
+			}
+
+			// Handle our known shapes
+			switch (part.type) {
+				case 'text': {
+					return part.text
+				}
+				case 'image_url': {
+					const urlField = part.image_url
+
+					// image_url might be string or {url: string; detail?}
+					return typeof urlField === 'string'
+						? urlField
+						: urlField.url
+				}
+				default: {
+					// Fallback: maybe it has a `.text`, or just JSON‐ify it
+					return typeof part === 'object' &&
+						part !== null &&
+						'text' in part &&
+						typeof part.text === 'string'
+						? part.text
+						: JSON.stringify(part)
+				}
+			}
+		})
+		.join('')
+}
 
 interface TavilySearchResult {
 	title: string
@@ -193,19 +240,10 @@ export async function createResearchCompleteTool(): Promise<DynamicStructuredToo
 	})
 }
 
-export async function getAllTools(): Promise<DynamicStructuredTool[]> {
-	const tools: DynamicStructuredTool[] = []
-
-	// Add ResearchComplete tool
-	const researchCompleteTool = await createResearchCompleteTool()
-	tools.push(researchCompleteTool)
-
-	// Add search tools
-	const searchTool = await createTavilySearchTool()
-	tools.push(searchTool)
-
-	return tools
-}
+export const getAllTools = async () => [
+	await createResearchCompleteTool(),
+	await createTavilySearchTool()
+]
 
 export function getNotesFromToolCalls(messages: BaseMessage[]): string[] {
 	return messages
@@ -218,9 +256,13 @@ export function getNotesFromToolCalls(messages: BaseMessage[]): string[] {
 //########################
 
 export function isTokenLimitExceeded(
-	exception: Error,
+	exception: unknown,
 	modelName?: string
 ): boolean {
+	if (!(exception instanceof Error)) {
+		return false
+	}
+
 	const errorStr = exception.message.toLowerCase()
 	let provider: string | null = null
 

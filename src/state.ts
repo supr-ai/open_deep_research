@@ -49,25 +49,24 @@ export type ResearchQuestion = z.infer<typeof ResearchQuestionSchema>
 
 export type OverrideValue<T> = T | { type: 'override'; value: T }
 
-export function overrideReducer<T>(
-	currentValue: T[],
-	newValue: OverrideValue<T[]>
-): T[] {
-	if (
-		typeof newValue === 'object' &&
-		newValue !== null &&
-		'type' in newValue &&
-		newValue.type === 'override'
-	) {
-		return newValue.value
-	} else {
-		return [...currentValue, ...(newValue as T[])]
-	}
-}
+export const isOverrideValue = <T>(
+	value: OverrideValue<T>
+): value is { type: 'override'; value: T } =>
+	typeof value === 'object' &&
+	value !== null &&
+	'type' in value &&
+	value.type === 'override'
 
-export function addReducer<T>(currentValue: T[], newValue: T[]): T[] {
-	return [...currentValue, ...newValue]
-}
+export const getOverrideValue = <T>(value: OverrideValue<T>): T =>
+	isOverrideValue(value) ? value.value : value
+
+export const reduceOverrideValue = <T>(
+	currentValue: OverrideValue<T[]>,
+	newValue: OverrideValue<T[]>
+) =>
+	isOverrideValue(newValue)
+		? newValue.value
+		: [...getOverrideValue(currentValue), ...newValue]
 
 export interface AgentInputState {
 	messages: BaseMessage[]

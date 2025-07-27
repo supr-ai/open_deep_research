@@ -1,16 +1,17 @@
-import { formatDate } from './utils'
+import { BaseMessage } from '@langchain/core/messages'
+import { formatDate, getBufferString } from './utils'
 
 export const clarifyWithUserInstructions = ({
 	messages,
 	date = new Date()
 }: {
-	messages: string
+	messages: BaseMessage[]
 	date?: Date
 }) =>
 	`
 These are the messages that have been exchanged so far from the user asking for the report:
 <Messages>
-${messages}
+${getBufferString(messages)}
 </Messages>
 
 Today's date is ${formatDate(date)}.
@@ -51,7 +52,7 @@ export const transformMessagesIntoResearchTopicPrompt = ({
 	messages,
 	date = new Date()
 }: {
-	messages: string
+	messages: BaseMessage[]
 	date?: Date
 }) =>
 	`
@@ -60,7 +61,7 @@ Your job is to translate these messages into a more detailed and concrete resear
 
 The messages that have been exchanged so far between yourself and the user are:
 <Messages>
-${messages}
+${getBufferString(messages)}
 </Messages>
 
 Today's date is ${formatDate(date)}.
@@ -258,7 +259,7 @@ export const finalReportGenerationPrompt = ({
 	date = new Date()
 }: {
 	researchBrief: string
-	messages: string
+	messages: BaseMessage[]
 	findings: string
 	date?: Date
 }) =>
@@ -270,7 +271,7 @@ ${researchBrief}
 
 For more context, here is all of the messages so far. Focus on the research brief above, but consider these messages as well for more context.
 <Messages>
-${messages}
+${getBufferString(messages)}
 </Messages>
 CRITICAL: Make sure the answer is written in the same language as the human messages!
 For example, if the user's messages are in English, then MAKE SURE you write your response in English. If the user's messages are in Chinese, then MAKE SURE you write your entire response in Chinese.
