@@ -78,7 +78,7 @@ const researcher = async (
 	])
 
 	return new Command({
-		goto: 'researcher_tools',
+		goto: 'researcherTools',
 		update: {
 			researcher_messages: [response],
 			tool_call_iterations: (state.tool_call_iterations || 0) + 1
@@ -121,7 +121,7 @@ const researcherTools = async (
 		!mostRecentMessage.tool_calls ||
 		mostRecentMessage.tool_calls.length === 0
 	) {
-		return new Command({ goto: 'compress_research' })
+		return new Command({ goto: 'compressResearch' })
 	}
 
 	// Otherwise, execute tools and gather results.
@@ -165,7 +165,7 @@ const researcherTools = async (
 
 	if (exceededToolCallIterations || researchCompleteToolCall) {
 		return new Command({
-			goto: 'compress_research',
+			goto: 'compressResearch',
 			update: { researcher_messages: toolOutputs }
 		})
 	}
@@ -257,13 +257,13 @@ const compressResearch = async (
 
 const researcherGraph = new StateGraph(ResearcherAnnotation)
 	.addNode('researcher', researcher)
-	.addNode('researcher_tools', researcherTools)
-	.addNode('compress_research', compressResearch)
+	.addNode('researcherTools', researcherTools)
+	.addNode('compressResearch', compressResearch)
 	.addEdge(START, 'researcher')
-	.addEdge('researcher', 'researcher_tools')
-	.addEdge('researcher_tools', 'compress_research')
-	.addEdge('researcher_tools', 'researcher')
-	.addEdge('compress_research', END)
+	.addEdge('researcher', 'researcherTools')
+	.addEdge('researcherTools', 'compressResearch')
+	.addEdge('researcherTools', 'researcher')
+	.addEdge('compressResearch', END)
 	.compile()
 
 export default researcherGraph

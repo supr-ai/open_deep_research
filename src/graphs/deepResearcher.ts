@@ -10,7 +10,7 @@ import { Command } from '@langchain/langgraph'
 import { Configuration } from '../configuration.js'
 import {
 	clarifyWithUserInstructions,
-	finalReportGenerationPrompt,
+	generateFinalReportPrompt,
 	leadResearcherPrompt,
 	transformMessagesIntoResearchTopicPrompt
 } from '../prompts.js'
@@ -130,7 +130,7 @@ const writeResearchBrief = async (
 	])
 
 	return new Command({
-		goto: 'research_supervisor',
+		goto: 'researchSupervisor',
 		update: {
 			research_brief: response.research_brief,
 			supervisor_messages: {
@@ -149,7 +149,7 @@ const writeResearchBrief = async (
 	})
 }
 
-const finalReportGeneration = async (
+const generateFinalReport = async (
 	state: typeof DeepResearcherAnnotation.State,
 	config: RunnableConfig
 ) => {
@@ -167,7 +167,7 @@ const finalReportGeneration = async (
 	let currentRetry = 0
 
 	while (currentRetry <= maxRetries) {
-		const finalReportPrompt = finalReportGenerationPrompt({
+		const finalReportPrompt = generateFinalReportPrompt({
 			researchBrief: state.research_brief,
 			messages: state.messages,
 			findings
@@ -223,16 +223,16 @@ const finalReportGeneration = async (
 }
 
 const deepResearcherGraph = new StateGraph(DeepResearcherAnnotation)
-	.addNode('clarify_with_user', clarifyWithUser)
+	.addNode('clarifyWithUser', clarifyWithUser)
 	.addNode('write_research_brief', writeResearchBrief)
-	.addNode('research_supervisor', supervisorGraph)
-	.addNode('final_report_generation', finalReportGeneration)
-	.addEdge(START, 'clarify_with_user')
-	.addEdge('clarify_with_user', 'write_research_brief')
-	.addEdge('clarify_with_user', END)
-	.addEdge('write_research_brief', 'research_supervisor')
-	.addEdge('research_supervisor', 'final_report_generation')
-	.addEdge('final_report_generation', END)
+	.addNode('researchSupervisor', supervisorGraph)
+	.addNode('generateFinalReport', generateFinalReport)
+	.addEdge(START, 'clarifyWithUser')
+	.addEdge('clarifyWithUser', 'write_research_brief')
+	.addEdge('clarifyWithUser', END)
+	.addEdge('write_research_brief', 'researchSupervisor')
+	.addEdge('researchSupervisor', 'generateFinalReport')
+	.addEdge('generateFinalReport', END)
 	.compile()
 
 export default deepResearcherGraph

@@ -252,7 +252,7 @@ All above messages are about research conducted by an AI Researcher. Please clea
 DO NOT summarize the information. I want the raw information returned, just in a cleaner format. Make sure all relevant information is preserved - you can rewrite findings verbatim.
 `.trim()
 
-export const finalReportGenerationPrompt = ({
+export const generateFinalReportPrompt = ({
 	researchBrief,
 	messages,
 	findings,

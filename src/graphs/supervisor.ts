@@ -70,7 +70,7 @@ const supervisor = async (
 	const response = await researchModel.invoke(supervisorMessages)
 
 	return new Command({
-		goto: 'supervisor_tools',
+		goto: 'supervisorTools',
 		update: {
 			supervisor_messages: [response],
 			research_iterations: (state.research_iterations || 0) + 1
@@ -210,11 +210,11 @@ const supervisorTools = async (
 
 const supervisorGraph = new StateGraph(SupervisorAnnotation)
 	.addNode('supervisor', supervisor)
-	.addNode('supervisor_tools', supervisorTools)
+	.addNode('supervisorTools', supervisorTools)
 	.addEdge(START, 'supervisor')
-	.addEdge('supervisor', 'supervisor_tools')
-	.addEdge('supervisor_tools', 'supervisor')
-	.addEdge('supervisor_tools', END)
+	.addEdge('supervisor', 'supervisorTools')
+	.addEdge('supervisorTools', 'supervisor')
+	.addEdge('supervisorTools', END)
 	.compile()
 
 export default supervisorGraph
