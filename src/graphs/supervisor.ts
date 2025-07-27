@@ -212,6 +212,9 @@ const supervisorGraph = new StateGraph(SupervisorAnnotation)
 	.addNode('supervisor', supervisor)
 	.addNode('supervisor_tools', supervisorTools)
 	.addEdge(START, 'supervisor')
+	.addEdge('supervisor', 'supervisor_tools')
+	.addEdge('supervisor_tools', 'supervisor')
+	.addEdge('supervisor_tools', END)
 	.compile()
 
 export default supervisorGraph

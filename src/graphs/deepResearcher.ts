@@ -1,50 +1,29 @@
-import { initChatModel } from 'langchain/chat_models/universal'
 import {
 	AIMessage,
 	HumanMessage,
 	SystemMessage,
-	ToolMessage,
 	BaseMessage
 } from '@langchain/core/messages'
 import { RunnableConfig } from '@langchain/core/runnables'
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph'
 import { Command } from '@langchain/langgraph'
-
 import { Configuration } from '../configuration.js'
 import {
 	clarifyWithUserInstructions,
-	compressResearchSimpleHumanMessage,
-	compressResearchSystemPrompt,
 	finalReportGenerationPrompt,
 	leadResearcherPrompt,
-	researchSystemPrompt,
 	transformMessagesIntoResearchTopicPrompt
 } from '../prompts.js'
 import {
-	AgentInputState,
-	AgentState,
-	ClarifyWithUser,
 	ClarifyWithUserSchema,
-	ConductResearch,
-	ConductResearchSchema,
 	getOverrideValue,
 	reduceOverrideValue,
 	OverrideValue,
-	ResearchComplete,
-	ResearchCompleteSchema,
-	ResearcherOutputState,
-	ResearcherState,
-	ResearchQuestion,
-	ResearchQuestionSchema,
-	SupervisorState
+	ResearchQuestionSchema
 } from '../state.js'
 import {
-	getAllTools,
 	getApiKeyForModel,
-	getNotesFromToolCalls,
 	isTokenLimitExceeded,
-	removeUpToLastAIMessage,
-	getBufferString,
 	configurableModel,
 	MODEL_TOKEN_LIMITS,
 	messageContentToString
@@ -249,6 +228,9 @@ const deepResearcherGraph = new StateGraph(DeepResearcherAnnotation)
 	.addNode('research_supervisor', supervisorGraph)
 	.addNode('final_report_generation', finalReportGeneration)
 	.addEdge(START, 'clarify_with_user')
+	.addEdge('clarify_with_user', 'write_research_brief')
+	.addEdge('clarify_with_user', END)
+	.addEdge('write_research_brief', 'research_supervisor')
 	.addEdge('research_supervisor', 'final_report_generation')
 	.addEdge('final_report_generation', END)
 	.compile()
