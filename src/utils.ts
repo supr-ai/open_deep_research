@@ -12,8 +12,13 @@ import { ResearchCompleteSchema } from './state.js'
 import { initChatModel } from 'langchain/chat_models/universal'
 
 export const configurableModel = initChatModel(undefined, {
-	configurableFields: ['model', 'maxTokens', 'apiKey']
+	configurableFields: ['provider', 'model', 'maxTokens', 'apiKey']
 })
+
+export const splitModel = (model: string) => {
+	const [provider, name] = model.split(':')
+	return { provider, model: name }
+}
 
 export const messageContentToString = (content: MessageContent) => {
 	// If it’s already a string, just return it

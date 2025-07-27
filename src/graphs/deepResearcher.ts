@@ -26,7 +26,8 @@ import {
 	isTokenLimitExceeded,
 	configurableModel,
 	MODEL_TOKEN_LIMITS,
-	messageContentToString
+	messageContentToString,
+	splitModel
 } from '../utils.js'
 import supervisorGraph from './supervisor.js'
 
@@ -63,12 +64,12 @@ const clarifyWithUser = async (
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
 	if (!configurable.allow_clarification) {
-		return new Command({ goto: 'write_researchBrief' })
+		return new Command({ goto: 'writeResearchBrief' })
 	}
 
 	const messages = state.messages
 	const modelConfig = {
-		model: configurable.research_model,
+		...splitModel(configurable.research_model),
 		maxTokens: configurable.research_model_max_tokens,
 		apiKey: getApiKeyForModel(configurable.research_model)
 	}
@@ -95,7 +96,7 @@ const clarifyWithUser = async (
 		})
 	} else {
 		return new Command({
-			goto: 'write_researchBrief',
+			goto: 'writeResearchBrief',
 			update: {
 				messages: [new AIMessage({ content: response.verification })]
 			}
@@ -109,7 +110,7 @@ const writeResearchBrief = async (
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
 	const researchModelConfig = {
-		model: configurable.research_model,
+		...splitModel(configurable.research_model),
 		maxTokens: configurable.research_model_max_tokens,
 		apiKey: getApiKeyForModel(configurable.research_model)
 	}
@@ -157,7 +158,7 @@ const generateFinalReport = async (
 	const configurable = Configuration.fromRunnableConfig(config)
 
 	const writerModelConfig = {
-		model: configurable.finalReport_model,
+		...splitModel(configurable.finalReport_model),
 		maxTokens: configurable.finalReport_model_max_tokens,
 		apiKey: getApiKeyForModel(configurable.research_model)
 	}
@@ -224,13 +225,13 @@ const generateFinalReport = async (
 
 const deepResearcherGraph = new StateGraph(DeepResearcherAnnotation)
 	.addNode('clarifyWithUser', clarifyWithUser)
-	.addNode('write_researchBrief', writeResearchBrief)
+	.addNode('writeResearchBrief', writeResearchBrief)
 	.addNode('researchSupervisor', supervisorGraph)
 	.addNode('generateFinalReport', generateFinalReport)
 	.addEdge(START, 'clarifyWithUser')
-	.addEdge('clarifyWithUser', 'write_researchBrief')
+	.addEdge('clarifyWithUser', 'writeResearchBrief')
 	.addEdge('clarifyWithUser', END)
-	.addEdge('write_researchBrief', 'researchSupervisor')
+	.addEdge('writeResearchBrief', 'researchSupervisor')
 	.addEdge('researchSupervisor', 'generateFinalReport')
 	.addEdge('generateFinalReport', END)
 	.compile()

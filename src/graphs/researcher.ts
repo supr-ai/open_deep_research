@@ -22,7 +22,8 @@ import {
 	isTokenLimitExceeded,
 	removeUpToLastAIMessage,
 	configurableModel,
-	messageContentToString
+	messageContentToString,
+	splitModel
 } from '../utils.js'
 import { DynamicStructuredTool } from '@langchain/core/tools.js'
 
@@ -66,7 +67,7 @@ const researcher = async (
 		})
 		.withConfig({
 			configurable: {
-				model: configurable.research_model,
+				...splitModel(configurable.research_model),
 				maxTokens: configurable.research_model_max_tokens,
 				apiKey: getApiKeyForModel(configurable.research_model)
 			}
@@ -186,7 +187,7 @@ const compressResearch = async (
 	const synthesizerModel = (await configurableModel)
 		.withConfig({
 			configurable: {
-				model: configurable.compression_model,
+				...splitModel(configurable.compression_model),
 				maxTokens: configurable.compression_model_max_tokens,
 				apiKey: getApiKeyForModel(configurable.compression_model)
 			}
