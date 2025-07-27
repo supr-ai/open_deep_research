@@ -39,7 +39,7 @@ Open Deep Research is a LangGraph-based deep research agent system with multiple
 
 -   **deep_researcher.py**: Main graph builder implementing supervisor-researcher architecture
 -   **state.py**: State definitions (AgentState, SupervisorState, ResearcherState)
--   **configuration.py**: Configurable settings for models, search APIs, and behavior
+-   **configuration.py**: Configurable settings for models and behavior
 -   **prompts.py**: All system prompts for research, compression, and report generation
 -   **utils.py**: Helper functions for token management, tool handling, and API keys
 
@@ -59,8 +59,8 @@ Open Deep Research is a LangGraph-based deep research agent system with multiple
 
 3. **Search Integration**:
 
-    - Supports multiple search APIs: Tavily, OpenAI Native, Anthropic Native
-    - Search API compatibility requirements vary by model provider
+    - Supports Tavily search API
+    - Tavily search works with all model providers
     - MCP (Model Context Protocol) server support for extended capabilities
 
 4. **State Management**:
@@ -81,8 +81,7 @@ Two alternative approaches with different trade-offs:
 1. **Model Requirements**:
 
     - All models MUST support structured outputs
-    - Research/Compression models must be compatible with chosen search API
-    - Native search requires matching model provider (e.g., Anthropic search needs Anthropic models)
+    - All models must support tool calling
 
 2. **Environment Variables**:
 

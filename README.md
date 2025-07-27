@@ -56,7 +56,6 @@ Open Deep Research offers extensive configuration options to customize the resea
 
 #### Research Configuration
 
-- **Search API** (default: Tavily): Choose from Tavily (works with all models), OpenAI Native Web Search, Anthropic Native Web Search, or None
 - **Max Researcher Iterations** (default: 3): Number of times the Research Supervisor will reflect on research and ask follow-up questions
 - **Max React Tool Calls** (default: 5): Maximum number of tool calling iterations in a single researcher step
 
@@ -64,7 +63,7 @@ Open Deep Research offers extensive configuration options to customize the resea
 
 Open Deep Research uses multiple specialized models for different research tasks:
 
-- **Summarization Model** (default: `openai:gpt-4.1-nano`): Summarizes research results from search APIs
+- **Summarization Model** (default: `openai:gpt-4.1-nano`): Summarizes research results from Tavily search
 - **Research Model** (default: `openai:gpt-4.1`): Conducts research and analysis 
 - **Compression Model** (default: `openai:gpt-4.1-mini`): Compresses research findings from sub-agents
 - **Final Report Model** (default: `openai:gpt-4.1`): Writes the final comprehensive report
@@ -75,8 +74,7 @@ All models are configured using [init_chat_model() API](https://python.langchain
 
 1. **Structured Outputs**: All models must support structured outputs. Check support [here](https://python.langchain.com/docs/integrations/chat/).
 
-2. **Search API Compatibility**: Research and Compression models must support your selected search API:
-   - Anthropic search requires Anthropic models with web search capability
+2. **Tool Calling**: All models must support tool calling for Tavily search integration
    - OpenAI search requires OpenAI models with web search capability  
    - Tavily works with all models
 

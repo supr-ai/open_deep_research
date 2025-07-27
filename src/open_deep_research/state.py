@@ -1,9 +1,11 @@
-from typing import Annotated, Optional
-from pydantic import BaseModel, Field
 import operator
-from langgraph.graph import MessagesState
+from typing import Annotated
+
 from langchain_core.messages import MessageLikeRepresentation
+from langgraph.graph import MessagesState
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
+
 
 ###################
 # Structured Outputs
@@ -53,7 +55,7 @@ class AgentInputState(MessagesState):
 
 class AgentState(MessagesState):
     supervisor_messages: Annotated[list[MessageLikeRepresentation], override_reducer]
-    research_brief: Optional[str]
+    research_brief: str | None
     raw_notes: Annotated[list[str], override_reducer] = []
     notes: Annotated[list[str], override_reducer] = []
     final_report: str

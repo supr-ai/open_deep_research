@@ -1,20 +1,32 @@
-import os
 import asyncio
+import os
 import warnings
 from datetime import datetime
 from typing import Annotated, List, Literal
-from langchain_core.tools import BaseTool, StructuredTool, tool, ToolException, InjectedToolArg
-from langchain_core.messages import HumanMessage, AIMessage, MessageLikeRepresentation, filter_messages
-from langchain_core.runnables import RunnableConfig
-from langchain_core.language_models import BaseChatModel
-from langchain.chat_models import init_chat_model
-from tavily import AsyncTavilyClient
-from mcp import McpError
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from open_deep_research.state import Summary, ResearchComplete
-from open_deep_research.configuration import SearchAPI, Configuration
-from open_deep_research.prompts import summarize_webpage_prompt
 
+from langchain.chat_models import init_chat_model
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    MessageLikeRepresentation,
+    filter_messages,
+)
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import (
+    BaseTool,
+    InjectedToolArg,
+    StructuredTool,
+    ToolException,
+    tool,
+)
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from mcp import McpError
+from tavily import AsyncTavilyClient
+
+from open_deep_research.configuration import Configuration
+from open_deep_research.prompts import summarize_webpage_prompt
+from open_deep_research.state import ResearchComplete, Summary
 
 ##########################
 # Tavily Search Tool Utils
@@ -30,10 +42,9 @@ async def tavily_search(
     topic: Annotated[Literal["general", "news", "finance"], InjectedToolArg] = "general",
     config: RunnableConfig = None
 ) -> str:
-    """
-    Fetches results from Tavily search API.
+    """Fetches results from Tavily search API.
 
-    Args
+    Args:
         queries (List[str]): List of search queries, you can pass in as many queries as you need.
         max_results (int): Maximum number of results to return
         topic (Literal['general', 'news', 'finance']): Topic to filter results by
@@ -49,7 +60,7 @@ async def tavily_search(
         config=config
     )
     # Format the search results and deduplicate results by URL
-    formatted_output = f"Search results: \n\n"
+    formatted_output = "Search results: \n\n"
     unique_results = {}
     for response in search_results:
         for result in response['results']:
@@ -192,23 +203,14 @@ async def load_mcp_tools(
 ##########################
 # Tool Utils
 ##########################
-async def get_search_tool(search_api: SearchAPI):
-    if search_api == SearchAPI.ANTHROPIC:
-        return [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
-    elif search_api == SearchAPI.OPENAI:
-        return [{"type": "web_search_preview"}]
-    elif search_api == SearchAPI.TAVILY:
-        search_tool = tavily_search
-        search_tool.metadata = {**(search_tool.metadata or {}), "type": "search", "name": "web_search"}
-        return [search_tool]
-    elif search_api == SearchAPI.NONE:
-        return []
+async def get_search_tool():
+    search_tool = tavily_search
+    search_tool.metadata = {**(search_tool.metadata or {}), "type": "search", "name": "web_search"}
+    return [search_tool]
     
 async def get_all_tools(config: RunnableConfig):
     tools = [tool(ResearchComplete)]
-    configurable = Configuration.from_runnable_config(config)
-    search_api = SearchAPI(get_config_value(configurable.search_api))
-    tools.extend(await get_search_tool(search_api))
+    tools.extend(await get_search_tool())
     existing_tool_names = {tool.name if hasattr(tool, "name") else tool.get("name", "web_search") for tool in tools}
     mcp_tools = await load_mcp_tools(config, existing_tool_names)
     tools.extend(mcp_tools)
@@ -221,28 +223,7 @@ def get_notes_from_tool_calls(messages: list[MessageLikeRepresentation]):
 ##########################
 # Model Provider Native Websearch Utils
 ##########################
-def anthropic_websearch_called(response):
-    try:
-        usage = response.response_metadata.get("usage")
-        if not usage:
-            return False
-        server_tool_use = usage.get("server_tool_use")
-        if not server_tool_use:
-            return False
-        web_search_requests = server_tool_use.get("web_search_requests")
-        if web_search_requests is None:
-            return False
-        return web_search_requests > 0
-    except (AttributeError, TypeError):
-        return False
-
-def openai_websearch_called(response):
-    tool_outputs = response.additional_kwargs.get("tool_outputs")
-    if tool_outputs:
-        for tool_output in tool_outputs:
-            if tool_output.get("type") == "web_search_call":
-                return True
-    return False
+# Removed native websearch utilities - only Tavily is supported
 
 
 ##########################
@@ -367,16 +348,6 @@ def remove_up_to_last_ai_message(messages: list[MessageLikeRepresentation]) -> l
 def get_today_str() -> str:
     """Get current date in a human-readable format."""
     return datetime.now().strftime("%a %b %-d, %Y")
-
-def get_config_value(value):
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    elif isinstance(value, dict):
-        return value
-    else:
-        return value.value
 
 def get_api_key_for_model(model_name: str, config: RunnableConfig):
     model_name = model_name.lower()

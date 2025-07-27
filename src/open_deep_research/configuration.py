@@ -1,27 +1,22 @@
-from pydantic import BaseModel, Field
-from typing import Any, List, Optional
-from langchain_core.runnables import RunnableConfig
 import os
-from enum import Enum
+from typing import Any, List
 
-class SearchAPI(Enum):
-    ANTHROPIC = "anthropic"
-    OPENAI = "openai"
-    TAVILY = "tavily"
-    NONE = "none"
+from langchain_core.runnables import RunnableConfig
+from pydantic import BaseModel, Field
+
 
 class MCPConfig(BaseModel):
-    url: Optional[str] = Field(
+    url: str | None = Field(
         default=None,
         optional=True,
     )
     """The URL of the MCP server"""
-    tools: Optional[List[str]] = Field(
+    tools: List[str] | None = Field(
         default=None,
         optional=True,
     )
     """The tools to make available to the LLM"""
-    auth_required: Optional[bool] = Field(
+    auth_required: bool | None = Field(
         default=False,
         optional=True,
     )
@@ -65,22 +60,6 @@ class Configuration(BaseModel):
         }
     )
     # Research Configuration
-    search_api: SearchAPI = Field(
-        default=SearchAPI.TAVILY,
-        metadata={
-            "x_oap_ui_config": {
-                "type": "select",
-                "default": "tavily",
-                "description": "Search API to use for research. NOTE: Make sure your Researcher Model supports the selected search API.",
-                "options": [
-                    {"label": "Tavily", "value": SearchAPI.TAVILY.value},
-                    {"label": "OpenAI Native Web Search", "value": SearchAPI.OPENAI.value},
-                    {"label": "Anthropic Native Web Search", "value": SearchAPI.ANTHROPIC.value},
-                    {"label": "None", "value": SearchAPI.NONE.value}
-                ]
-            }
-        }
-    )
     max_researcher_iterations: int = Field(
         default=3,
         metadata={
@@ -114,7 +93,7 @@ class Configuration(BaseModel):
             "x_oap_ui_config": {
                 "type": "text",
                 "default": "openai:gpt-4.1-nano",
-                "description": "Model for summarizing research results from Tavily search results"
+                "description": "Model for summarizing research results from search results"
             }
         }
     )
@@ -134,7 +113,7 @@ class Configuration(BaseModel):
             "x_oap_ui_config": {
                 "type": "text",
                 "default": "openai:gpt-4.1",
-                "description": "Model for conducting research. NOTE: Make sure your Researcher Model supports the selected search API."
+                "description": "Model for conducting research."
             }
         }
     )
@@ -154,7 +133,7 @@ class Configuration(BaseModel):
             "x_oap_ui_config": {
                 "type": "text",
                 "default": "openai:gpt-4.1-mini",
-                "description": "Model for compressing research findings from sub-agents. NOTE: Make sure your Compression Model supports the selected search API."
+                "description": "Model for compressing research findings from sub-agents."
             }
         }
     )
@@ -189,7 +168,7 @@ class Configuration(BaseModel):
         }
     )
     # MCP server configuration
-    mcp_config: Optional[MCPConfig] = Field(
+    mcp_config: MCPConfig | None = Field(
         default=None,
         optional=True,
         metadata={
@@ -199,7 +178,7 @@ class Configuration(BaseModel):
             }
         }
     )
-    mcp_prompt: Optional[str] = Field(
+    mcp_prompt: str | None = Field(
         default=None,
         optional=True,
         metadata={
@@ -213,7 +192,7 @@ class Configuration(BaseModel):
 
     @classmethod
     def from_runnable_config(
-        cls, config: Optional[RunnableConfig] = None
+        cls, config: RunnableConfig | None = None
     ) -> "Configuration":
         """Create a Configuration instance from a RunnableConfig."""
         configurable = config.get("configurable", {}) if config else {}

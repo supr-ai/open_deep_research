@@ -1,43 +1,50 @@
-from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage, get_buffer_string, filter_messages
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph import START, END, StateGraph
-from langgraph.types import Command
 import asyncio
 from typing import Literal
-from open_deep_research.configuration import (
-    Configuration, 
+
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+    filter_messages,
+    get_buffer_string,
 )
-from open_deep_research.state import (
-    AgentState,
-    AgentInputState,
-    SupervisorState,
-    ResearcherState,
-    ClarifyWithUser,
-    ResearchQuestion,
-    ConductResearch,
-    ResearchComplete,
-    ResearcherOutputState
+from langchain_core.runnables import RunnableConfig
+from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
+
+from open_deep_research.configuration import (
+    Configuration,
 )
 from open_deep_research.prompts import (
     clarify_with_user_instructions,
-    transform_messages_into_research_topic_prompt,
-    research_system_prompt,
-    compress_research_system_prompt,
     compress_research_simple_human_message,
+    compress_research_system_prompt,
     final_report_generation_prompt,
-    lead_researcher_prompt
+    lead_researcher_prompt,
+    research_system_prompt,
+    transform_messages_into_research_topic_prompt,
+)
+from open_deep_research.state import (
+    AgentInputState,
+    AgentState,
+    ClarifyWithUser,
+    ConductResearch,
+    ResearchComplete,
+    ResearcherOutputState,
+    ResearcherState,
+    ResearchQuestion,
+    SupervisorState,
 )
 from open_deep_research.utils import (
+    get_all_tools,
+    get_api_key_for_model,
+    get_model_token_limit,
+    get_notes_from_tool_calls,
     get_today_str,
     is_token_limit_exceeded,
-    get_model_token_limit,
-    get_all_tools,
-    openai_websearch_called,
-    anthropic_websearch_called,
     remove_up_to_last_ai_message,
-    get_api_key_for_model,
-    get_notes_from_tool_calls
 )
 
 # Initialize a configurable model that we will use throughout the agent
@@ -223,8 +230,8 @@ async def researcher_tools(state: ResearcherState, config: RunnableConfig) -> Co
     configurable = Configuration.from_runnable_config(config)
     researcher_messages = state.get("researcher_messages", [])
     most_recent_message = researcher_messages[-1]
-    # Early Exit Criteria: No tool calls (or native web search calls)were made by the researcher
-    if not most_recent_message.tool_calls and not (openai_websearch_called(most_recent_message) or anthropic_websearch_called(most_recent_message)):
+    # Early Exit Criteria: No tool calls were made by the researcher
+    if not most_recent_message.tool_calls:
         return Command(
             goto="compress_research",
         )
