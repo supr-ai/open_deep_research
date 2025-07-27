@@ -63,21 +63,21 @@ const clarifyWithUser = async (
 	config: RunnableConfig
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
-	if (!configurable.allow_clarification) {
+	if (!configurable.allowClarification) {
 		return new Command({ goto: 'writeResearchBrief' })
 	}
 
 	const messages = state.messages
 	const modelConfig = {
-		...splitModel(configurable.research_model),
-		maxTokens: configurable.research_model_max_tokens,
-		apiKey: getApiKeyForModel(configurable.research_model)
+		...splitModel(configurable.researchModel),
+		maxTokens: configurable.researchModelMaxTokens,
+		apiKey: getApiKeyForModel(configurable.researchModel)
 	}
 
 	const model = (await configurableModel)
 		.withStructuredOutput(ClarifyWithUserSchema)
 		.withRetry({
-			stopAfterAttempt: configurable.max_structured_output_retries
+			stopAfterAttempt: configurable.maxStructuredOutputRetries
 		})
 		.withConfig({ configurable: modelConfig })
 
@@ -110,15 +110,15 @@ const writeResearchBrief = async (
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
 	const researchModelConfig = {
-		...splitModel(configurable.research_model),
-		maxTokens: configurable.research_model_max_tokens,
-		apiKey: getApiKeyForModel(configurable.research_model)
+		...splitModel(configurable.researchModel),
+		maxTokens: configurable.researchModelMaxTokens,
+		apiKey: getApiKeyForModel(configurable.researchModel)
 	}
 
 	const researchModel = (await configurableModel)
 		.withStructuredOutput(ResearchQuestionSchema)
 		.withRetry({
-			stopAfterAttempt: configurable.max_structured_output_retries
+			stopAfterAttempt: configurable.maxStructuredOutputRetries
 		})
 		.withConfig({ configurable: researchModelConfig })
 
@@ -140,7 +140,7 @@ const writeResearchBrief = async (
 					new SystemMessage({
 						content: leadResearcherPrompt({
 							maxConcurrentResearchUnits:
-								configurable.max_concurrent_research_units
+								configurable.maxConcurrentResearchUnits
 						})
 					}),
 					new HumanMessage({ content: response.researchBrief })
@@ -158,9 +158,9 @@ const generateFinalReport = async (
 	const configurable = Configuration.fromRunnableConfig(config)
 
 	const writerModelConfig = {
-		...splitModel(configurable.finalReport_model),
-		maxTokens: configurable.finalReport_model_max_tokens,
-		apiKey: getApiKeyForModel(configurable.research_model)
+		...splitModel(configurable.finalReportModel),
+		maxTokens: configurable.finalReportModelMaxTokens,
+		apiKey: getApiKeyForModel(configurable.researchModel)
 	}
 
 	let findings = getOverrideValue(state.notes).join('\n')
@@ -188,12 +188,12 @@ const generateFinalReport = async (
 			if (
 				isTokenLimitExceeded(
 					error as Error,
-					configurable.finalReport_model
+					configurable.finalReportModel
 				)
 			) {
 				if (currentRetry === 0) {
 					const modelTokenLimit =
-						MODEL_TOKEN_LIMITS[configurable.finalReport_model]
+						MODEL_TOKEN_LIMITS[configurable.finalReportModel]
 					if (!modelTokenLimit) {
 						return {
 							finalReport: `Error generating final report: Token limit exceeded, however, we could not determine the model's maximum context length. Please update the model map in deepResearcher/utils.ts with this information. ${error}`,

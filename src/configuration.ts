@@ -19,46 +19,46 @@ export interface ConfigField {
 
 export const ConfigurationSchema = z.object({
 	// General Configuration
-	max_structured_output_retries: z.number().default(3),
-	allow_clarification: z.boolean().default(true),
-	max_concurrent_research_units: z.number().default(5),
+	maxStructuredOutputRetries: z.number().default(3),
+	allowClarification: z.boolean().default(true),
+	maxConcurrentResearchUnits: z.number().default(5),
 
 	// Research Configuration
-	max_researcher_iterations: z.number().default(3),
-	max_react_tool_calls: z.number().default(5),
+	maxResearcherIterations: z.number().default(3),
+	maxReactToolCalls: z.number().default(5),
 
 	// Model Configuration
-	summarization_model: z.string().default('openai:gpt-4.1-nano'),
-	summarization_model_max_tokens: z.number().default(8192),
-	research_model: z.string().default('openai:gpt-4.1'),
-	research_model_max_tokens: z.number().default(10000),
-	compression_model: z.string().default('openai:gpt-4.1-mini'),
-	compression_model_max_tokens: z.number().default(8192),
-	finalReport_model: z.string().default('openai:gpt-4.1'),
-	finalReport_model_max_tokens: z.number().default(10000)
+	summarizationModel: z.string().default('openai:gpt-4.1-nano'),
+	summarizationModelMaxTokens: z.number().default(8192),
+	researchModel: z.string().default('openai:gpt-4.1'),
+	researchModelMaxTokens: z.number().default(10000),
+	compressionModel: z.string().default('openai:gpt-4.1-mini'),
+	compressionModelMaxTokens: z.number().default(8192),
+	finalReportModel: z.string().default('openai:gpt-4.1'),
+	finalReportModelMaxTokens: z.number().default(10000)
 })
 
 export type ConfigurationType = z.infer<typeof ConfigurationSchema>
 
 export class Configuration {
 	// General Configuration
-	max_structured_output_retries: number = 3
-	allow_clarification: boolean = true
-	max_concurrent_research_units: number = 5
+	maxStructuredOutputRetries: number = 3
+	allowClarification: boolean = true
+	maxConcurrentResearchUnits: number = 5
 
 	// Research Configuration
-	max_researcher_iterations: number = 3
-	max_react_tool_calls: number = 5
+	maxResearcherIterations: number = 3
+	maxReactToolCalls: number = 5
 
 	// Model Configuration
-	summarization_model: string = 'openai:gpt-4.1-nano'
-	summarization_model_max_tokens: number = 8192
-	research_model: string = 'openai:gpt-4.1'
-	research_model_max_tokens: number = 10000
-	compression_model: string = 'openai:gpt-4.1-mini'
-	compression_model_max_tokens: number = 8192
-	finalReport_model: string = 'openai:gpt-4.1'
-	finalReport_model_max_tokens: number = 10000
+	summarizationModel: string = 'openai:gpt-4.1-nano'
+	summarizationModelMaxTokens: number = 8192
+	researchModel: string = 'openai:gpt-4.1'
+	researchModelMaxTokens: number = 10000
+	compressionModel: string = 'openai:gpt-4.1-mini'
+	compressionModelMaxTokens: number = 8192
+	finalReportModel: string = 'openai:gpt-4.1'
+	finalReportModelMaxTokens: number = 10000
 
 	constructor(config?: Partial<ConfigurationType>) {
 		if (config) {
@@ -70,19 +70,19 @@ export class Configuration {
 		const configurable = config?.configurable ?? {}
 
 		const fieldNames = [
-			'max_structured_output_retries',
-			'allow_clarification',
-			'max_concurrent_research_units',
-			'max_researcher_iterations',
-			'max_react_tool_calls',
-			'summarization_model',
-			'summarization_model_max_tokens',
-			'research_model',
-			'research_model_max_tokens',
-			'compression_model',
-			'compression_model_max_tokens',
-			'finalReport_model',
-			'finalReport_model_max_tokens'
+			'maxStructuredOutputRetries',
+			'allowClarification',
+			'maxConcurrentResearchUnits',
+			'maxResearcherIterations',
+			'maxReactToolCalls',
+			'summarizationModel',
+			'summarizationModelMaxTokens',
+			'researchModel',
+			'researchModelMaxTokens',
+			'compressionModel',
+			'compressionModelMaxTokens',
+			'finalReportModel',
+			'finalReportModelMaxTokens'
 		]
 
 		const values: Record<string, any> = {}
@@ -95,15 +95,15 @@ export class Configuration {
 			if (value !== undefined && value !== null) {
 				// Convert string values to appropriate types
 				if (
-					fieldName.includes('_retries') ||
-					fieldName.includes('_iterations') ||
-					fieldName.includes('_calls') ||
-					fieldName.includes('_units') ||
-					fieldName.includes('_tokens')
+					fieldName.endsWith('Retries') ||
+					fieldName.endsWith('Iterations') ||
+					fieldName.endsWith('Calls') ||
+					fieldName.endsWith('Units') ||
+					fieldName.endsWith('Tokens')
 				) {
 					values[fieldName] =
 						typeof value === 'string' ? parseInt(value, 10) : value
-				} else if (fieldName === 'allow_clarification') {
+				} else if (fieldName === 'allowClarification') {
 					values[fieldName] =
 						typeof value === 'string'
 							? value.toLowerCase() === 'true'
@@ -119,7 +119,7 @@ export class Configuration {
 
 	// Static field definitions for UI metadata (equivalent to Python's model_fields)
 	static readonly modelFields: Record<string, ConfigField> = {
-		max_structured_output_retries: {
+		maxStructuredOutputRetries: {
 			default: 3,
 			metadata: {
 				x_oap_ui_config: {
@@ -132,7 +132,7 @@ export class Configuration {
 				}
 			}
 		},
-		allow_clarification: {
+		allowClarification: {
 			default: true,
 			metadata: {
 				x_oap_ui_config: {
@@ -143,7 +143,7 @@ export class Configuration {
 				}
 			}
 		},
-		max_concurrent_research_units: {
+		maxConcurrentResearchUnits: {
 			default: 5,
 			metadata: {
 				x_oap_ui_config: {
@@ -157,7 +157,7 @@ export class Configuration {
 				}
 			}
 		},
-		max_researcher_iterations: {
+		maxResearcherIterations: {
 			default: 3,
 			metadata: {
 				x_oap_ui_config: {
@@ -171,7 +171,7 @@ export class Configuration {
 				}
 			}
 		},
-		max_react_tool_calls: {
+		maxReactToolCalls: {
 			default: 5,
 			metadata: {
 				x_oap_ui_config: {
@@ -185,7 +185,7 @@ export class Configuration {
 				}
 			}
 		},
-		summarization_model: {
+		summarizationModel: {
 			default: 'openai:gpt-4.1-nano',
 			metadata: {
 				x_oap_ui_config: {
@@ -196,7 +196,7 @@ export class Configuration {
 				}
 			}
 		},
-		summarization_model_max_tokens: {
+		summarizationModelMaxTokens: {
 			default: 8192,
 			metadata: {
 				x_oap_ui_config: {
@@ -206,7 +206,7 @@ export class Configuration {
 				}
 			}
 		},
-		research_model: {
+		researchModel: {
 			default: 'openai:gpt-4.1',
 			metadata: {
 				x_oap_ui_config: {
@@ -216,7 +216,7 @@ export class Configuration {
 				}
 			}
 		},
-		research_model_max_tokens: {
+		researchModelMaxTokens: {
 			default: 10000,
 			metadata: {
 				x_oap_ui_config: {
@@ -226,7 +226,7 @@ export class Configuration {
 				}
 			}
 		},
-		compression_model: {
+		compressionModel: {
 			default: 'openai:gpt-4.1-mini',
 			metadata: {
 				x_oap_ui_config: {
@@ -237,7 +237,7 @@ export class Configuration {
 				}
 			}
 		},
-		compression_model_max_tokens: {
+		compressionModelMaxTokens: {
 			default: 8192,
 			metadata: {
 				x_oap_ui_config: {
@@ -247,7 +247,7 @@ export class Configuration {
 				}
 			}
 		},
-		finalReport_model: {
+		finalReportModel: {
 			default: 'openai:gpt-4.1',
 			metadata: {
 				x_oap_ui_config: {
@@ -258,7 +258,7 @@ export class Configuration {
 				}
 			}
 		},
-		finalReport_model_max_tokens: {
+		finalReportModelMaxTokens: {
 			default: 10000,
 			metadata: {
 				x_oap_ui_config: {

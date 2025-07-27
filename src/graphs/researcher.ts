@@ -63,13 +63,13 @@ const researcher = async (
 	const researchModel = (await configurableModel)
 		.bindTools(tools)
 		.withRetry({
-			stopAfterAttempt: configurable.max_structured_output_retries
+			stopAfterAttempt: configurable.maxStructuredOutputRetries
 		})
 		.withConfig({
 			configurable: {
-				...splitModel(configurable.research_model),
-				maxTokens: configurable.research_model_max_tokens,
-				apiKey: getApiKeyForModel(configurable.research_model)
+				...splitModel(configurable.researchModel),
+				maxTokens: configurable.researchModelMaxTokens,
+				apiKey: getApiKeyForModel(configurable.researchModel)
 			}
 		})
 
@@ -159,7 +159,7 @@ const researcherTools = async (
 
 	// Late Exit Criteria
 	const exceededToolCallIterations =
-		(state.toolCallIterations || 0) >= configurable.max_react_tool_calls
+		(state.toolCallIterations || 0) >= configurable.maxReactToolCalls
 	const researchCompleteToolCall = toolCalls.some(
 		toolCall => toolCall.name === 'ResearchComplete'
 	)
@@ -187,13 +187,13 @@ const compressResearch = async (
 	const synthesizerModel = (await configurableModel)
 		.withConfig({
 			configurable: {
-				...splitModel(configurable.compression_model),
-				maxTokens: configurable.compression_model_max_tokens,
-				apiKey: getApiKeyForModel(configurable.compression_model)
+				...splitModel(configurable.compressionModel),
+				maxTokens: configurable.compressionModelMaxTokens,
+				apiKey: getApiKeyForModel(configurable.compressionModel)
 			}
 		})
 		.withRetry({
-			stopAfterAttempt: configurable.max_structured_output_retries
+			stopAfterAttempt: configurable.maxStructuredOutputRetries
 		})
 
 	let researcherMessages = [...state.researcherMessages]
@@ -227,7 +227,7 @@ const compressResearch = async (
 			}
 		} catch (error) {
 			synthesisAttempts += 1
-			if (isTokenLimitExceeded(error, configurable.research_model)) {
+			if (isTokenLimitExceeded(error, configurable.researchModel)) {
 				researcherMessages = removeUpToLastAIMessage(researcherMessages)
 				console.error(
 					`Token limit exceeded while synthesizing: ${error}. Pruning the messages to try again.`

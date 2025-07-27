@@ -54,16 +54,15 @@ const supervisor = async (
 ) => {
 	const configurable = Configuration.fromRunnableConfig(config)
 	const researchModelConfig = {
-		...splitModel(configurable.research_model),
-		maxTokens: configurable.research_model_max_tokens,
-		apiKey: getApiKeyForModel(configurable.research_model)
+		...splitModel(configurable.researchModel),
+		maxTokens: configurable.researchModelMaxTokens,
+		apiKey: getApiKeyForModel(configurable.researchModel)
 	}
 
-	const leadResearcherTools = [ConductResearchSchema, ResearchCompleteSchema]
 	const researchModel = (await configurableModel)
-		.bindTools(leadResearcherTools)
+		.bindTools([ConductResearchSchema, ResearchCompleteSchema])
 		.withRetry({
-			stopAfterAttempt: configurable.max_structured_output_retries
+			stopAfterAttempt: configurable.maxStructuredOutputRetries
 		})
 		.withConfig({ configurable: researchModelConfig })
 
@@ -94,7 +93,7 @@ const supervisorTools = async (
 
 	// Exit Criteria
 	const exceededAllowedIterations =
-		researchIterations >= configurable.max_researcher_iterations
+		researchIterations >= configurable.maxResearcherIterations
 	const noToolCalls =
 		!mostRecentMessage.tool_calls ||
 		mostRecentMessage.tool_calls.length === 0
@@ -121,10 +120,10 @@ const supervisorTools = async (
 
 		const conductResearchCalls = allConductResearchCalls.slice(
 			0,
-			configurable.max_concurrent_research_units
+			configurable.maxConcurrentResearchUnits
 		)
 		const overflowConductResearchCalls = allConductResearchCalls.slice(
-			configurable.max_concurrent_research_units
+			configurable.maxConcurrentResearchUnits
 		)
 
 		const researchPromises = conductResearchCalls.map(async toolCall => {
@@ -164,7 +163,7 @@ const supervisorTools = async (
 			)
 		})
 
-		// Handle any tool calls made > max_concurrent_research_units
+		// Handle any tool calls made > maxConcurrentResearchUnits
 		overflowConductResearchCalls.forEach(overflowToolCall => {
 			if (!overflowToolCall.id) {
 				throw new Error('Missing tool call ID')
@@ -172,7 +171,7 @@ const supervisorTools = async (
 
 			toolMessages.push(
 				new ToolMessage({
-					content: `Error: Did not run this research as you have already exceeded the maximum number of concurrent research units. Please try again with ${configurable.max_concurrent_research_units} or fewer research units.`,
+					content: `Error: Did not run this research as you have already exceeded the maximum number of concurrent research units. Please try again with ${configurable.maxConcurrentResearchUnits} or fewer research units.`,
 					name: 'ConductResearch',
 					tool_call_id: overflowToolCall.id
 				})
@@ -193,7 +192,7 @@ const supervisorTools = async (
 			}
 		})
 	} catch (error) {
-		if (isTokenLimitExceeded(error, configurable.research_model)) {
+		if (isTokenLimitExceeded(error, configurable.researchModel)) {
 			console.error(`Token limit exceeded while reflecting: ${error}`)
 		} else {
 			console.error(`Other error in reflection phase: ${error}`)
