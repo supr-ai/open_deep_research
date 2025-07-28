@@ -1,17 +1,8 @@
-import { z } from 'zod'
-import { DynamicStructuredTool } from '@langchain/core/tools'
-import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import {
-	HumanMessage,
 	ToolMessage,
 	BaseMessage,
 	MessageContent
 } from '@langchain/core/messages'
-import { summarizeWebpagePrompt } from './prompts.js'
-import { ResearchCompleteSchema } from './tools/researchComplete.js'
-import { initChatModel } from 'langchain/chat_models/universal.js'
-import { tavily } from '@tavily/core'
-import createTimeout from './lib/createTimeout.js'
 
 export const messageContentToString = (content: MessageContent) => {
 	// If it’s already a string, just return it
@@ -54,48 +45,6 @@ export const messageContentToString = (content: MessageContent) => {
 		.join('')
 }
 
-interface TavilySearchResult {
-	title: string
-	url: string
-	content: string
-	raw_content?: string
-}
-
-interface TavilySearchResponse {
-	query: string
-	results: TavilySearchResult[]
-}
-
-export async function summarizeWebpage(
-	model: BaseChatModel,
-	webpageContent: string
-): Promise<string> {
-	try {
-		const summary = await Promise.race([
-			model.invoke([
-				new HumanMessage({
-					content: summarizeWebpagePrompt({
-						webpageContent,
-						date: new Date()
-					})
-				})
-			]),
-			createTimeout(60000)
-		])
-
-		// Assuming the model returns a structured Summary object
-		const summaryData = summary.content as any
-		return `<summary>\n${summaryData.summary}\n</summary>\n\n<key_excerpts>\n${summaryData.key_excerpts}\n</key_excerpts>`
-	} catch (error) {
-		console.error(`Failed to summarize webpage: ${error}`)
-		return webpageContent
-	}
-}
-
-//########################
-// Tool Utils
-//########################
-
 export function getNotesFromToolCalls(messages: BaseMessage[]): string[] {
 	return messages
 		.filter((msg): msg is ToolMessage => msg.getType() === 'tool')
@@ -120,20 +69,6 @@ export function formatDate(date: Date): string {
 		month: 'short',
 		day: 'numeric'
 	})
-}
-
-export function getApiKeyForModel(modelName: string): string {
-	const modelStr = modelName.toLowerCase()
-
-	if (modelStr.startsWith('openai:')) {
-		return process.env.OPENAI_API_KEY!
-	} else if (modelStr.startsWith('anthropic:')) {
-		return process.env.ANTHROPIC_API_KEY!
-	} else if (modelStr.startsWith('google')) {
-		return process.env.GOOGLE_API_KEY!
-	}
-
-	throw new Error(`Unsupported model: ${modelName}`)
 }
 
 export function getBufferString(messages: BaseMessage[]): string {

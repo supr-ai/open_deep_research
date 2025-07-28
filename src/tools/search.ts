@@ -6,7 +6,7 @@ import {
 	ResearchOptionsSchema
 } from '../lib/options.js'
 import { getChatModel } from '../lib/model.js'
-import { summarizeWebpagePrompt } from '../prompts.js'
+import { summarizeWebpagePrompt } from '../lib/prompts.js'
 import { tavily } from '@tavily/core'
 import { BaseChatModel } from '@langchain/core/language_models/chat_models.js'
 import createTimeout from '../lib/createTimeout.js'

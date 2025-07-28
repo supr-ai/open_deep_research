@@ -16,7 +16,7 @@ import {
 	generateFinalReportPrompt,
 	leadResearcherPrompt,
 	transformMessagesIntoResearchTopicPrompt
-} from '../prompts.js'
+} from '../lib/prompts.js'
 import {
 	ClarifyWithUserSchema,
 	getOverrideValue,

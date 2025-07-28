@@ -17,7 +17,7 @@ import {
 	compressResearchSimpleHumanMessage,
 	compressResearchSystemPrompt,
 	researchSystemPrompt
-} from '../prompts.js'
+} from '../lib/prompts.js'
 import { reduceOverrideValue, OverrideValue } from '../state.js'
 import {
 	getAllTools,
