@@ -7,7 +7,10 @@ import {
 import { RunnableConfig } from '@langchain/core/runnables'
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph'
 import { Command } from '@langchain/langgraph'
-import { Configuration } from '../options.js'
+import {
+	ResearchOptions,
+	researchOptionsFromRunnableConfig
+} from '../lib/options.js'
 import {
 	clarifyWithUserInstructions,
 	generateFinalReportPrompt,
@@ -23,12 +26,11 @@ import {
 } from '../state.js'
 import {
 	getApiKeyForModel,
-	isTokenLimitExceeded,
 	configurableModel,
-	MODEL_TOKEN_LIMITS,
 	messageContentToString,
 	splitModel
 } from '../utils.js'
+import { isTokenLimitExceeded } from '../lib/isTokenLimitExceeded.js'
 import supervisorGraph from './supervisor.js'
 
 const DeepResearcherAnnotation = Annotation.Root({
@@ -62,7 +64,7 @@ const clarifyWithUser = async (
 	state: typeof DeepResearcherAnnotation.State,
 	config: RunnableConfig
 ) => {
-	const configurable = Configuration.fromRunnableConfig(config)
+	const configurable = researchOptionsFromRunnableConfig(config)
 	if (!configurable.allowClarification) {
 		return new Command({ goto: 'writeResearchBrief' })
 	}
@@ -108,7 +110,7 @@ const writeResearchBrief = async (
 	state: typeof DeepResearcherAnnotation.State,
 	config: RunnableConfig
 ) => {
-	const configurable = Configuration.fromRunnableConfig(config)
+	const configurable = researchOptionsFromRunnableConfig(config)
 	const researchModelConfig = {
 		...splitModel(configurable.researchModel),
 		maxTokens: configurable.researchModelMaxTokens,
@@ -155,7 +157,7 @@ const generateFinalReport = async (
 	config: RunnableConfig
 ) => {
 	const clearedState = { notes: { type: 'override' as const, value: [] } }
-	const configurable = Configuration.fromRunnableConfig(config)
+	const configurable = researchOptionsFromRunnableConfig(config)
 
 	const writerModelConfig = {
 		...splitModel(configurable.finalReportModel),

@@ -9,7 +9,10 @@ import {
 import { RunnableConfig } from '@langchain/core/runnables'
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph'
 import { Command } from '@langchain/langgraph'
-import { Configuration } from '../options.js'
+import {
+	ResearchOptions,
+	researchOptionsFromRunnableConfig
+} from '../lib/options.js'
 import {
 	compressResearchSimpleHumanMessage,
 	compressResearchSystemPrompt,
@@ -19,12 +22,14 @@ import { reduceOverrideValue, OverrideValue } from '../state.js'
 import {
 	getAllTools,
 	getApiKeyForModel,
-	isTokenLimitExceeded,
-	removeUpToLastAIMessage,
 	configurableModel,
 	messageContentToString,
 	splitModel
 } from '../utils.js'
+import {
+	isTokenLimitExceeded,
+	removeUpToLastAIMessage
+} from '../lib/isTokenLimitExceeded.js'
 import { DynamicStructuredTool } from '@langchain/core/tools.js'
 
 const ResearcherAnnotation = Annotation.Root({

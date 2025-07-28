@@ -10,9 +10,6 @@ export const ConductResearchSchema = z.object({
 
 export type ConductResearch = z.infer<typeof ConductResearchSchema>
 
-export const ResearchCompleteSchema = z.object({})
-export type ResearchComplete = z.infer<typeof ResearchCompleteSchema>
-
 export const SummarySchema = z.object({
 	summary: z.string(),
 	key_excerpts: z.string()
