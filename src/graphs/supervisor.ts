@@ -1,5 +1,4 @@
 import {
-	AIMessage,
 	HumanMessage,
 	ToolMessage,
 	BaseMessage,
@@ -8,28 +7,26 @@ import {
 import { RunnableConfig } from '@langchain/core/runnables'
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph'
 import { Command } from '@langchain/langgraph'
-import {
-	ResearchOptions,
-	researchOptionsFromRunnableConfig
-} from '../lib/options.js'
-import {
-	ConductResearchSchema,
-	getOverrideValue,
-	reduceOverrideValue,
-	OverrideValue,
-	ResearchCompleteSchema
-} from '../state.js'
-import {
-	getApiKeyForModel,
-	getNotesFromToolCalls,
-	configurableModel,
-	splitModel
-} from '../utils.js'
-import { isTokenLimitExceeded } from '../lib/isTokenLimitExceeded.js'
+import isTokenLimitExceeded from '../lib/isTokenLimitExceeded.js'
 import researcherGraph from './researcher.js'
+import {
+	getOverrideValue,
+	OptionalOverrideValue,
+	reduceOverrideValue
+} from '../lib/overrideValue.js'
+import { z } from 'zod'
+import researchCompleteTool, {
+	ResearchCompleteSchema
+} from '../tools/researchComplete.js'
+import { researchOptionsFromRunnableConfig } from '../lib/options.js'
+import { getChatModel } from '../lib/model.js'
+import getNotesFromToolCalls from '../lib/getNotesFromToolCalls.js'
+import conductResearchTool, {
+	ConductResearchSchema
+} from '../tools/conductResearch.js'
 
 const SupervisorAnnotation = Annotation.Root({
-	supervisorMessages: Annotation<OverrideValue<BaseMessage[]>>({
+	supervisorMessages: Annotation<OptionalOverrideValue<BaseMessage[]>>({
 		reducer: reduceOverrideValue,
 		default: (): BaseMessage[] => []
 	}),
@@ -37,7 +34,7 @@ const SupervisorAnnotation = Annotation.Root({
 		reducer: (_current, update) => update,
 		default: () => ''
 	}),
-	notes: Annotation<OverrideValue<string[]>>({
+	notes: Annotation<OptionalOverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	}),
@@ -45,66 +42,59 @@ const SupervisorAnnotation = Annotation.Root({
 		reducer: (_current, update) => update,
 		default: () => 0
 	}),
-	rawNotes: Annotation<OverrideValue<string[]>>({
+	rawNotes: Annotation<OptionalOverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	})
 })
 
-const supervisor = async (
+type SupervisorNodeHandler = (
 	state: typeof SupervisorAnnotation.State,
 	config: RunnableConfig
-) => {
-	const configurable = Configuration.fromRunnableConfig(config)
-	const researchModelConfig = {
-		...splitModel(configurable.researchModel),
-		maxTokens: configurable.researchModelMaxTokens,
-		apiKey: getApiKeyForModel(configurable.researchModel)
-	}
+) => Promise<
+	Command<
+		'supervisor' | 'supervisorTools' | typeof END,
+		Partial<typeof SupervisorAnnotation.State>
+	>
+>
 
-	const researchModel = (await configurableModel)
-		.bindTools([ConductResearchSchema, ResearchCompleteSchema])
+const supervisor: SupervisorNodeHandler = async (state, config) => {
+	const options = researchOptionsFromRunnableConfig(config)
+
+	const response = await getChatModel(options.researchModel)
+		.bindTools([conductResearchTool, researchCompleteTool])
 		.withRetry({
-			stopAfterAttempt: configurable.maxStructuredOutputRetries
+			stopAfterAttempt: options.maxStructuredOutputRetries
 		})
-		.withConfig({ configurable: researchModelConfig })
-
-	const supervisorMessages = getOverrideValue(state.supervisorMessages)
-	const response = await researchModel.invoke(supervisorMessages)
+		.invoke(getOverrideValue(state.supervisorMessages))
 
 	return new Command({
 		goto: 'supervisorTools',
 		update: {
 			supervisorMessages: [response],
-			researchIterations: (state.researchIterations || 0) + 1
+			researchIterations: state.researchIterations + 1
 		}
 	})
 }
 
-const supervisorTools = async (
-	state: typeof SupervisorAnnotation.State,
-	config: RunnableConfig
-) => {
-	const configurable = Configuration.fromRunnableConfig(config)
+const supervisorTools: SupervisorNodeHandler = async (state, config) => {
+	const options = researchOptionsFromRunnableConfig(config)
+
 	const supervisorMessages = getOverrideValue(state.supervisorMessages)
-	const researchIterations = state.researchIterations || 0
-	const mostRecentMessage = supervisorMessages[supervisorMessages.length - 1]
 
-	if (!isAIMessage(mostRecentMessage)) {
-		throw new Error('Most recent message is not an AI message')
-	}
+	const lastMessage = supervisorMessages.at(-1)
+	if (!lastMessage) throw new Error('No messages in supervisorMessages')
 
-	// Exit Criteria
-	const exceededAllowedIterations =
-		researchIterations >= configurable.maxResearcherIterations
-	const noToolCalls =
-		!mostRecentMessage.tool_calls ||
-		mostRecentMessage.tool_calls.length === 0
-	const researchCompleteToolCall = mostRecentMessage.tool_calls?.some(
-		toolCall => toolCall.name === 'ResearchComplete'
-	)
+	if (!isAIMessage(lastMessage))
+		throw new Error('Last message is not an AI message')
 
-	if (exceededAllowedIterations || noToolCalls || researchCompleteToolCall) {
+	const toolCalls = lastMessage.tool_calls
+
+	if (
+		state.researchIterations >= options.maxResearcherIterations ||
+		!toolCalls?.length ||
+		toolCalls.some(toolCall => toolCall.name === researchCompleteTool.name)
+	) {
 		return new Command({
 			goto: END,
 			update: {
@@ -114,38 +104,40 @@ const supervisorTools = async (
 		})
 	}
 
-	// Otherwise, conduct research and gather results.
 	try {
-		const allConductResearchCalls =
-			mostRecentMessage.tool_calls?.filter(
-				toolCall => toolCall.name === 'ConductResearch'
-			) || []
+		const allConductResearchCalls = toolCalls.filter(
+			toolCall => toolCall.name === conductResearchTool.name
+		)
 
 		const conductResearchCalls = allConductResearchCalls.slice(
 			0,
-			configurable.maxConcurrentResearchUnits
+			options.maxConcurrentResearchUnits
 		)
+
 		const overflowConductResearchCalls = allConductResearchCalls.slice(
-			configurable.maxConcurrentResearchUnits
+			options.maxConcurrentResearchUnits
 		)
 
-		const researchPromises = conductResearchCalls.map(async toolCall => {
-			return researcherGraph.invoke(
-				{
-					researcherMessages: [
-						new HumanMessage({
-							content: toolCall.args.researchTopic
-						})
-					],
-					researchTopic: toolCall.args.researchTopic,
-					toolCallIterations: 0,
-					rawNotes: { type: 'override', value: [] }
-				},
-				config
-			)
-		})
+		const toolResults = await Promise.all(
+			conductResearchCalls.map(async toolCall => {
+				const { researchTopic } = ConductResearchSchema.parse(
+					toolCall.args
+				)
 
-		const toolResults = await Promise.all(researchPromises)
+				return researcherGraph.invoke(
+					{
+						researcherMessages: [
+							new HumanMessage({ content: researchTopic })
+						],
+						researchTopic,
+						toolCallIterations: 0,
+						rawNotes: { type: 'override', value: [] }
+					},
+					config
+				)
+			})
+		)
+
 		const toolMessages: ToolMessage[] = []
 
 		toolResults.forEach((observation, index) => {
@@ -166,22 +158,21 @@ const supervisorTools = async (
 			)
 		})
 
-		// Handle any tool calls made > maxConcurrentResearchUnits
-		overflowConductResearchCalls.forEach(overflowToolCall => {
+		for (const overflowToolCall of overflowConductResearchCalls) {
 			if (!overflowToolCall.id) {
 				throw new Error('Missing tool call ID')
 			}
 
 			toolMessages.push(
 				new ToolMessage({
-					content: `Error: Did not run this research as you have already exceeded the maximum number of concurrent research units. Please try again with ${configurable.maxConcurrentResearchUnits} or fewer research units.`,
-					name: 'ConductResearch',
+					content: `Error: Did not run this research as you have already exceeded the maximum number of concurrent research units. Please try again with ${options.maxConcurrentResearchUnits} or fewer research units.`,
+					name: overflowToolCall.name,
 					tool_call_id: overflowToolCall.id
 				})
 			)
-		})
+		}
 
-		const rawNotesConcat = toolResults
+		const joinedRawNotes = toolResults
 			.map(observation =>
 				getOverrideValue(observation.rawNotes).join('\n')
 			)
@@ -191,11 +182,14 @@ const supervisorTools = async (
 			goto: 'supervisor',
 			update: {
 				supervisorMessages: toolMessages,
-				rawNotes: [rawNotesConcat]
+				rawNotes: [joinedRawNotes]
 			}
 		})
 	} catch (error) {
-		if (isTokenLimitExceeded(error, configurable.researchModel)) {
+		if (
+			error instanceof Error &&
+			isTokenLimitExceeded(error, options.researchModel)
+		) {
 			console.error(`Token limit exceeded while reflecting: ${error}`)
 		} else {
 			console.error(`Other error in reflection phase: ${error}`)

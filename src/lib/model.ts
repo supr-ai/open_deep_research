@@ -2,7 +2,6 @@ import z from 'zod'
 import { ChatOpenAI } from '@langchain/openai'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
-import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 
 export const ModelSchema = z.strictObject({
 	provider: z.enum(['openai', 'anthropic', 'gemini']),
@@ -11,9 +10,9 @@ export const ModelSchema = z.strictObject({
 	maxTokens: z.number()
 })
 
-export const getChatModel = (
-	model: z.infer<typeof ModelSchema>
-): BaseChatModel => {
+export type ChatModel = ChatOpenAI | ChatAnthropic | ChatGoogleGenerativeAI
+
+export const getChatModel = (model: z.infer<typeof ModelSchema>): ChatModel => {
 	const options = { model: model.name, apiKey: model.apiKey }
 
 	switch (model.provider) {

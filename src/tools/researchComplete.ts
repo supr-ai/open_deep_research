@@ -1,11 +1,10 @@
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 
-export const ResearchCompleteSchema = z.object({})
-export type ResearchComplete = z.infer<typeof ResearchCompleteSchema>
+export const ResearchCompleteSchema = z.strictObject({})
 
 const researchCompleteTool = new DynamicStructuredTool({
-	name: 'ResearchComplete',
+	name: 'researchComplete',
 	description: 'Call this tool to indicate that the research is complete.',
 	schema: ResearchCompleteSchema,
 	func: async () => 'Research completed'

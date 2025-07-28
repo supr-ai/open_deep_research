@@ -1,5 +1,6 @@
 import { BaseMessage } from '@langchain/core/messages'
-import { formatDate, getBufferString } from '../utils'
+import formatDate from './formatDate.js'
+import joinMessages from './joinMessages.js'
 
 export const clarifyWithUserInstructions = ({
 	messages,
@@ -11,7 +12,7 @@ export const clarifyWithUserInstructions = ({
 	`
 These are the messages that have been exchanged so far from the user asking for the report:
 <Messages>
-${getBufferString(messages)}
+${joinMessages(messages)}
 </Messages>
 
 Today's date is ${formatDate(date)}.
@@ -61,7 +62,7 @@ Your job is to translate these messages into a more detailed and concrete resear
 
 The messages that have been exchanged so far between yourself and the user are:
 <Messages>
-${getBufferString(messages)}
+${joinMessages(messages)}
 </Messages>
 
 Today's date is ${formatDate(date)}.
@@ -271,7 +272,7 @@ ${researchBrief}
 
 For more context, here is all of the messages so far. Focus on the research brief above, but consider these messages as well for more context.
 <Messages>
-${getBufferString(messages)}
+${joinMessages(messages)}
 </Messages>
 CRITICAL: Make sure the answer is written in the same language as the human messages!
 For example, if the user's messages are in English, then MAKE SURE you write your response in English. If the user's messages are in Chinese, then MAKE SURE you write your entire response in Chinese.
@@ -358,9 +359,9 @@ You are tasked with summarizing the raw content of a webpage retrieved from a we
 
 Here is the raw content of the webpage:
 
-<webpageContent>
+<Webpage Content>
 ${content}
-</webpageContent>
+</Webpage Content>
 
 Please follow these guidelines to create your summary:
 

@@ -1,36 +1,31 @@
 import {
-	AIMessage,
 	HumanMessage,
 	SystemMessage,
 	ToolMessage,
 	BaseMessage,
-	isAIMessage
+	isAIMessage,
+	isToolMessage
 } from '@langchain/core/messages'
 import { RunnableConfig } from '@langchain/core/runnables'
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph'
 import { Command } from '@langchain/langgraph'
 import {
-	ResearchOptions,
-	researchOptionsFromRunnableConfig
-} from '../lib/options.js'
-import {
 	compressResearchSimpleHumanMessage,
 	compressResearchSystemPrompt,
 	researchSystemPrompt
 } from '../lib/prompts.js'
-import { reduceOverrideValue, OverrideValue } from '../state.js'
 import {
-	getAllTools,
-	getApiKeyForModel,
-	configurableModel,
-	messageContentToString,
-	splitModel
-} from '../utils.js'
-import {
-	isTokenLimitExceeded,
-	removeUpToLastAIMessage
-} from '../lib/isTokenLimitExceeded.js'
-import { DynamicStructuredTool } from '@langchain/core/tools.js'
+	reduceOverrideValue,
+	OptionalOverrideValue
+} from '../lib/overrideValue.js'
+import messageContentToString from '../lib/messageContentToString.js'
+import { researchOptionsFromRunnableConfig } from '../lib/options.js'
+import tools, { toolsByName } from '../tools/index.js'
+import { getChatModel } from '../lib/model.js'
+import runToolSafely from '../lib/runToolSafely.js'
+import isTokenLimitExceeded from '../lib/isTokenLimitExceeded.js'
+import removeAfterLastAiMessage from '../lib/removeAfterLastAiMessage.js'
+import researchCompleteTool from '../tools/researchComplete.js'
 
 const ResearcherAnnotation = Annotation.Root({
 	researcherMessages: Annotation<BaseMessage[]>({
@@ -49,216 +44,162 @@ const ResearcherAnnotation = Annotation.Root({
 		reducer: (_current, update) => update,
 		default: () => ''
 	}),
-	rawNotes: Annotation<OverrideValue<string[]>>({
+	rawNotes: Annotation<OptionalOverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	})
 })
 
-const researcher = async (
+type ResearcherNodeHandler = (
 	state: typeof ResearcherAnnotation.State,
 	config: RunnableConfig
-) => {
-	const configurable = Configuration.fromRunnableConfig(config)
-	const researcherMessages = state.researcherMessages
-	const tools = await getAllTools()
+) => Promise<
+	Command<
+		'researcher' | 'researcherTools' | 'compressResearch' | typeof END,
+		Partial<typeof ResearcherAnnotation.State>
+	>
+>
 
-	const researcherSystemPrompt = researchSystemPrompt({})
+const researcher: ResearcherNodeHandler = async (state, config) => {
+	const options = researchOptionsFromRunnableConfig(config)
 
-	const researchModel = (await configurableModel)
+	const response = await getChatModel(options.researchModel)
 		.bindTools(tools)
 		.withRetry({
-			stopAfterAttempt: configurable.maxStructuredOutputRetries
+			stopAfterAttempt: options.maxStructuredOutputRetries
 		})
-		.withConfig({
-			configurable: {
-				...splitModel(configurable.researchModel),
-				maxTokens: configurable.researchModelMaxTokens,
-				apiKey: getApiKeyForModel(configurable.researchModel)
-			}
-		})
-
-	const response = await researchModel.invoke([
-		new SystemMessage({ content: researcherSystemPrompt }),
-		...researcherMessages
-	])
+		.invoke([
+			new SystemMessage({ content: researchSystemPrompt({}) }),
+			...state.researcherMessages
+		])
 
 	return new Command({
 		goto: 'researcherTools',
 		update: {
 			researcherMessages: [response],
-			toolCallIterations: (state.toolCallIterations || 0) + 1
+			toolCallIterations: state.toolCallIterations + 1
 		}
 	})
 }
 
-const executeToolSafely = async (
-	tool: DynamicStructuredTool,
-	args: unknown,
-	config: RunnableConfig
-) => {
-	try {
-		const result = await tool.invoke(args, config)
+const researcherTools: ResearcherNodeHandler = async (state, config) => {
+	const options = researchOptionsFromRunnableConfig(config)
 
-		if (typeof result !== 'string') {
-			throw new Error('Tool returned non-string result')
-		}
+	const lastMessage = state.researcherMessages.at(-1)
+	if (!lastMessage) throw new Error('No messages in state')
 
-		return result
-	} catch (error) {
-		return `Error executing tool: ${error}`
-	}
-}
-
-const researcherTools = async (
-	state: typeof ResearcherAnnotation.State,
-	config: RunnableConfig
-) => {
-	const configurable = Configuration.fromRunnableConfig(config)
-	const researcherMessages = state.researcherMessages
-	const mostRecentMessage = researcherMessages[researcherMessages.length - 1]
-
-	if (!isAIMessage(mostRecentMessage)) {
+	if (!isAIMessage(lastMessage))
 		throw new Error('Most recent message is not an AI message')
-	}
 
-	// Early Exit Criteria: No tool calls were made by the researcher
-	if (
-		!mostRecentMessage.tool_calls ||
-		mostRecentMessage.tool_calls.length === 0
-	) {
-		return new Command({ goto: 'compressResearch' })
-	}
+	// No tool calls were made by the researcher
+
+	const toolCalls = lastMessage.tool_calls
+	if (!toolCalls?.length) return new Command({ goto: 'compressResearch' })
 
 	// Otherwise, execute tools and gather results.
-	const tools = await getAllTools()
 
-	const toolsByName = tools.reduce<Record<string, DynamicStructuredTool>>(
-		(acc, tool) => {
-			acc[tool.name] = tool
-			return acc
-		},
-		{}
-	)
-
-	const toolCalls = mostRecentMessage.tool_calls
 	const observations = await Promise.all(
 		toolCalls.map(toolCall =>
-			executeToolSafely(toolsByName[toolCall.name], toolCall.args, config)
+			runToolSafely(toolsByName[toolCall.name], toolCall.args, config)
 		)
 	)
 
 	const toolOutputs = observations.map((observation, index) => {
 		const toolCall = toolCalls[index]
-
-		if (!toolCall.id) {
-			throw new Error('Missing tool call ID')
-		}
+		if (!toolCall.id) throw new Error('Missing tool call ID')
 
 		return new ToolMessage({
-			content: observation,
+			tool_call_id: toolCall.id,
 			name: toolCall.name,
-			tool_call_id: toolCall.id
+			content: observation
 		})
 	})
 
-	// Late Exit Criteria
-	const exceededToolCallIterations =
-		(state.toolCallIterations || 0) >= configurable.maxReactToolCalls
-	const researchCompleteToolCall = toolCalls.some(
-		toolCall => toolCall.name === 'ResearchComplete'
+	const didExceedToolCallIterations =
+		state.toolCallIterations >= options.maxReactToolCalls
+
+	const didCallResearchCompleteTool = toolCalls.some(
+		toolCall => toolCall.name === researchCompleteTool.name
 	)
 
-	if (exceededToolCallIterations || researchCompleteToolCall) {
-		return new Command({
-			goto: 'compressResearch',
-			update: { researcherMessages: toolOutputs }
-		})
-	}
-
 	return new Command({
-		goto: 'researcher',
-		update: { researcherMessages: toolOutputs }
+		goto:
+			didExceedToolCallIterations || didCallResearchCompleteTool
+				? 'compressResearch'
+				: 'researcher',
+		update: {
+			researcherMessages: toolOutputs
+		}
 	})
 }
 
-const compressResearch = async (
-	state: typeof ResearcherAnnotation.State,
-	config: RunnableConfig
-) => {
-	const configurable = Configuration.fromRunnableConfig(config)
-	let synthesisAttempts = 0
+const compressResearch: ResearcherNodeHandler = async (state, config) => {
+	const options = researchOptionsFromRunnableConfig(config)
 
-	const synthesizerModel = (await configurableModel)
-		.withConfig({
-			configurable: {
-				...splitModel(configurable.compressionModel),
-				maxTokens: configurable.compressionModelMaxTokens,
-				apiKey: getApiKeyForModel(configurable.compressionModel)
-			}
-		})
-		.withRetry({
-			stopAfterAttempt: configurable.maxStructuredOutputRetries
-		})
+	const model = getChatModel(options.compressionModel).withRetry({
+		stopAfterAttempt: options.maxStructuredOutputRetries
+	})
 
-	let researcherMessages = [...state.researcherMessages]
-	researcherMessages.push(
+	let researcherMessages = [
+		...state.researcherMessages,
 		new HumanMessage({ content: compressResearchSimpleHumanMessage })
-	)
+	]
 
-	while (synthesisAttempts < 3) {
+	const getNote = () =>
+		researcherMessages
+			.filter(message => isToolMessage(message) || isAIMessage(message))
+			.map(message => messageContentToString(message.content))
+			.join('\n')
+
+	for (let synthesisAttempt = 0; synthesisAttempt < 3; synthesisAttempt++) {
 		try {
-			const response = await synthesizerModel.invoke([
+			const response = await model.invoke([
 				new SystemMessage({
 					content: compressResearchSystemPrompt({})
 				}),
 				...researcherMessages
 			])
 
-			const filteredMessages = researcherMessages.filter(
-				msg => msg.getType() === 'tool' || msg.getType() === 'ai'
-			)
-
-			return {
-				compressedResearch: messageContentToString(response.content),
-				rawNotes: {
-					type: 'override',
-					value: [
-						filteredMessages
-							.map(m => messageContentToString(m.content))
-							.join('\n')
-					]
+			return new Command({
+				goto: END,
+				update: {
+					compressedResearch: messageContentToString(
+						response.content
+					),
+					rawNotes: {
+						type: 'override',
+						value: [getNote()]
+					}
 				}
-			}
+			})
 		} catch (error) {
-			synthesisAttempts += 1
-			if (isTokenLimitExceeded(error, configurable.researchModel)) {
-				researcherMessages = removeUpToLastAIMessage(researcherMessages)
+			if (
+				error instanceof Error &&
+				isTokenLimitExceeded(error, options.compressionModel)
+			) {
+				researcherMessages =
+					removeAfterLastAiMessage(researcherMessages)
+
 				console.error(
 					`Token limit exceeded while synthesizing: ${error}. Pruning the messages to try again.`
 				)
-				continue
+			} else {
+				console.error(`Error synthesizing research report: ${error}`)
 			}
-			console.error(`Error synthesizing research report: ${error}`)
 		}
 	}
 
-	const filteredMessages = researcherMessages.filter(
-		msg => msg.getType() === 'tool' || msg.getType() === 'ai'
-	)
-
-	return {
-		compressedResearch:
-			'Error synthesizing research report: Maximum retries exceeded',
-		rawNotes: {
-			type: 'override',
-			value: [
-				filteredMessages
-					.map(m => messageContentToString(m.content))
-					.join('\n')
-			]
+	return new Command({
+		goto: END,
+		update: {
+			compressedResearch:
+				'Error synthesizing research report: Maximum retries exceeded',
+			rawNotes: {
+				type: 'override',
+				value: [getNote()]
+			}
 		}
-	}
+	})
 }
 
 const researcherGraph = new StateGraph(ResearcherAnnotation)

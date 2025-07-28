@@ -5,15 +5,14 @@ import {
 	researchOptionsFromRunnableConfig,
 	ResearchOptionsSchema
 } from '../lib/options.js'
-import { getChatModel } from '../lib/model.js'
+import { ChatModel, getChatModel } from '../lib/model.js'
 import { summarizeWebpagePrompt } from '../lib/prompts.js'
 import { tavily } from '@tavily/core'
-import { BaseChatModel } from '@langchain/core/language_models/chat_models.js'
 import createTimeout from '../lib/createTimeout.js'
 
 const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY! })
 
-const SearchTopicSchema = z.enum(['general', 'news', 'finance'])
+export const SearchTopicSchema = z.enum(['general', 'news', 'finance'])
 
 interface SearchResult {
 	title: string
@@ -71,7 +70,7 @@ const SummarySchema = z.strictObject({
 })
 
 const summarizeWebpage = async (
-	model: BaseChatModel,
+	model: ChatModel,
 	content: string,
 	options: z.infer<typeof ResearchOptionsSchema>
 ) => {
@@ -158,7 +157,7 @@ const searchAndSummarize = async ({
 	}, {})
 }
 
-const SearchSchema = z.strictObject({
+export const SearchSchema = z.strictObject({
 	queries: z
 		.array(z.string())
 		.min(1)

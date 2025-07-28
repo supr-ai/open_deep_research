@@ -1,7 +1,7 @@
 import z from 'zod'
-import { ModelSchema } from './model'
+import { ModelSchema } from './model.js'
 
-const checkOpenAITokenLimit = (error: Error) => {
+const isOpenAITokenLimitExceeded = (error: Error) => {
 	const isBadRequest = ['BadRequestError', 'InvalidRequestError'].includes(
 		error.constructor.name
 	)
@@ -30,11 +30,11 @@ const checkOpenAITokenLimit = (error: Error) => {
 	)
 }
 
-const checkAnthropicTokenLimit = (error: Error) =>
+const isAnthropicTokenLimitExceeded = (error: Error) =>
 	error.constructor.name === 'BadRequestError' &&
 	error.message.toLowerCase().includes('prompt is too long')
 
-const checkGeminiTokenLimit = (error: Error) => {
+const isGeminiTokenLimitExceeded = (error: Error) => {
 	const isResourceExhausted = [
 		'ResourceExhausted',
 		'GoogleGenerativeAIFetchError'
@@ -53,11 +53,11 @@ const isTokenLimitExceeded = (
 ) => {
 	switch (model.provider) {
 		case 'openai':
-			return checkOpenAITokenLimit(error)
+			return isOpenAITokenLimitExceeded(error)
 		case 'anthropic':
-			return checkAnthropicTokenLimit(error)
+			return isAnthropicTokenLimitExceeded(error)
 		case 'gemini':
-			return checkGeminiTokenLimit(error)
+			return isGeminiTokenLimitExceeded(error)
 	}
 }
 

@@ -7,10 +7,7 @@ import {
 import { RunnableConfig } from '@langchain/core/runnables'
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph'
 import { Command } from '@langchain/langgraph'
-import {
-	ResearchOptions,
-	researchOptionsFromRunnableConfig
-} from '../lib/options.js'
+import { researchOptionsFromRunnableConfig } from '../lib/options.js'
 import {
 	clarifyWithUserInstructions,
 	generateFinalReportPrompt,
@@ -18,27 +15,22 @@ import {
 	transformMessagesIntoResearchTopicPrompt
 } from '../lib/prompts.js'
 import {
-	ClarifyWithUserSchema,
 	getOverrideValue,
 	reduceOverrideValue,
-	OverrideValue,
-	ResearchQuestionSchema
-} from '../state.js'
-import {
-	getApiKeyForModel,
-	configurableModel,
-	messageContentToString,
-	splitModel
-} from '../utils.js'
-import { isTokenLimitExceeded } from '../lib/isTokenLimitExceeded.js'
+	OptionalOverrideValue
+} from '../lib/overrideValue.js'
+import messageContentToString from '../lib/messageContentToString.js'
+import isTokenLimitExceeded from '../lib/isTokenLimitExceeded.js'
 import supervisorGraph from './supervisor.js'
+import { z } from 'zod'
+import { getChatModel } from '../lib/model.js'
 
 const DeepResearcherAnnotation = Annotation.Root({
 	messages: Annotation<BaseMessage[]>({
 		reducer: reduceOverrideValue,
 		default: (): BaseMessage[] => []
 	}),
-	supervisorMessages: Annotation<OverrideValue<BaseMessage[]>>({
+	supervisorMessages: Annotation<OptionalOverrideValue<BaseMessage[]>>({
 		reducer: reduceOverrideValue,
 		default: (): BaseMessage[] => []
 	}),
@@ -46,11 +38,11 @@ const DeepResearcherAnnotation = Annotation.Root({
 		reducer: (_current, update) => update,
 		default: () => ''
 	}),
-	rawNotes: Annotation<OverrideValue<string[]>>({
+	rawNotes: Annotation<OptionalOverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	}),
-	notes: Annotation<OverrideValue<string[]>>({
+	notes: Annotation<OptionalOverrideValue<string[]>>({
 		reducer: reduceOverrideValue,
 		default: (): string[] => []
 	}),
@@ -60,77 +52,93 @@ const DeepResearcherAnnotation = Annotation.Root({
 	})
 })
 
-const clarifyWithUser = async (
+type DeepResearcherNodeHandler = (
 	state: typeof DeepResearcherAnnotation.State,
 	config: RunnableConfig
-) => {
-	const configurable = researchOptionsFromRunnableConfig(config)
-	if (!configurable.allowClarification) {
+) => Promise<
+	Command<
+		| 'clarifyWithUser'
+		| 'writeResearchBrief'
+		| 'researchSupervisor'
+		| 'generateFinalReport'
+		| typeof END,
+		Partial<typeof DeepResearcherAnnotation.State>
+	>
+>
+
+const ClarifyWithUserSchema = z.strictObject({
+	needsClarification: z
+		.boolean()
+		.describe('Whether the user needs to be asked a clarifying question.'),
+	question: z
+		.string()
+		.describe('A question to ask the user to clarify the report scope'),
+	verification: z
+		.string()
+		.describe(
+			'Verify message that we will start research after the user has provided the necessary information.'
+		)
+})
+
+const clarifyWithUser: DeepResearcherNodeHandler = async (state, config) => {
+	const options = researchOptionsFromRunnableConfig(config)
+
+	if (!options.allowClarification)
 		return new Command({ goto: 'writeResearchBrief' })
-	}
 
-	const messages = state.messages
-	const modelConfig = {
-		...splitModel(configurable.researchModel),
-		maxTokens: configurable.researchModelMaxTokens,
-		apiKey: getApiKeyForModel(configurable.researchModel)
-	}
-
-	const model = (await configurableModel)
+	const response = await getChatModel(options.researchModel)
 		.withStructuredOutput(ClarifyWithUserSchema)
 		.withRetry({
-			stopAfterAttempt: configurable.maxStructuredOutputRetries
+			stopAfterAttempt: options.maxStructuredOutputRetries
 		})
-		.withConfig({ configurable: modelConfig })
+		.invoke([
+			new HumanMessage({
+				content: clarifyWithUserInstructions({
+					messages: state.messages
+				})
+			})
+		])
 
-	const response = await model.invoke([
-		new HumanMessage({
-			content: clarifyWithUserInstructions({ messages })
-		})
-	])
-
-	if (response.need_clarification) {
-		return new Command({
-			goto: END,
-			update: {
-				messages: [new AIMessage({ content: response.question })]
-			}
-		})
-	} else {
-		return new Command({
-			goto: 'writeResearchBrief',
-			update: {
-				messages: [new AIMessage({ content: response.verification })]
-			}
-		})
-	}
+	return response.needsClarification
+		? new Command({
+				goto: END,
+				update: {
+					messages: [new AIMessage({ content: response.question })]
+				}
+		  })
+		: new Command({
+				goto: 'writeResearchBrief',
+				update: {
+					messages: [
+						new AIMessage({ content: response.verification })
+					]
+				}
+		  })
 }
 
-const writeResearchBrief = async (
-	state: typeof DeepResearcherAnnotation.State,
-	config: RunnableConfig
-) => {
-	const configurable = researchOptionsFromRunnableConfig(config)
-	const researchModelConfig = {
-		...splitModel(configurable.researchModel),
-		maxTokens: configurable.researchModelMaxTokens,
-		apiKey: getApiKeyForModel(configurable.researchModel)
-	}
+const ResearchQuestionSchema = z.strictObject({
+	researchBrief: z
+		.string()
+		.describe(
+			'A research question that will be used to guide the research.'
+		)
+})
 
-	const researchModel = (await configurableModel)
+const writeResearchBrief: DeepResearcherNodeHandler = async (state, config) => {
+	const options = researchOptionsFromRunnableConfig(config)
+
+	const response = await getChatModel(options.researchModel)
 		.withStructuredOutput(ResearchQuestionSchema)
 		.withRetry({
-			stopAfterAttempt: configurable.maxStructuredOutputRetries
+			stopAfterAttempt: options.maxStructuredOutputRetries
 		})
-		.withConfig({ configurable: researchModelConfig })
-
-	const response = await researchModel.invoke([
-		new HumanMessage({
-			content: transformMessagesIntoResearchTopicPrompt({
-				messages: state.messages || []
+		.invoke([
+			new HumanMessage({
+				content: transformMessagesIntoResearchTopicPrompt({
+					messages: state.messages
+				})
 			})
-		})
-	])
+		])
 
 	return new Command({
 		goto: 'researchSupervisor',
@@ -142,7 +150,7 @@ const writeResearchBrief = async (
 					new SystemMessage({
 						content: leadResearcherPrompt({
 							maxConcurrentResearchUnits:
-								configurable.maxConcurrentResearchUnits
+								options.maxConcurrentResearchUnits
 						})
 					}),
 					new HumanMessage({ content: response.researchBrief })
@@ -152,24 +160,15 @@ const writeResearchBrief = async (
 	})
 }
 
-const generateFinalReport = async (
-	state: typeof DeepResearcherAnnotation.State,
-	config: RunnableConfig
+const generateFinalReport: DeepResearcherNodeHandler = async (
+	state,
+	config
 ) => {
-	const clearedState = { notes: { type: 'override' as const, value: [] } }
-	const configurable = researchOptionsFromRunnableConfig(config)
-
-	const writerModelConfig = {
-		...splitModel(configurable.finalReportModel),
-		maxTokens: configurable.finalReportModelMaxTokens,
-		apiKey: getApiKeyForModel(configurable.researchModel)
-	}
+	const options = researchOptionsFromRunnableConfig(config)
 
 	let findings = getOverrideValue(state.notes).join('\n')
-	const maxRetries = 3
-	let currentRetry = 0
 
-	while (currentRetry <= maxRetries) {
+	for (let currentRetry = 0; currentRetry < 3; currentRetry++) {
 		const finalReportPrompt = generateFinalReportPrompt({
 			researchBrief: state.researchBrief,
 			messages: state.messages,
@@ -177,52 +176,48 @@ const generateFinalReport = async (
 		})
 
 		try {
-			const finalReport = await (await configurableModel)
-				.withConfig({ configurable: writerModelConfig })
-				.invoke([new HumanMessage({ content: finalReportPrompt })])
+			const finalReport = await getChatModel(
+				options.finalReportModel
+			).invoke([new HumanMessage({ content: finalReportPrompt })])
 
-			return {
-				finalReport: messageContentToString(finalReport.content),
-				messages: [finalReport],
-				...clearedState
-			}
+			return new Command({
+				goto: END,
+				update: {
+					finalReport: messageContentToString(finalReport.content),
+					messages: [finalReport]
+				}
+			})
 		} catch (error) {
 			if (
-				isTokenLimitExceeded(
-					error as Error,
-					configurable.finalReportModel
-				)
+				error instanceof Error &&
+				isTokenLimitExceeded(error, options.finalReportModel)
 			) {
-				if (currentRetry === 0) {
-					const modelTokenLimit =
-						MODEL_TOKEN_LIMITS[configurable.finalReportModel]
-					if (!modelTokenLimit) {
-						return {
-							finalReport: `Error generating final report: Token limit exceeded, however, we could not determine the model's maximum context length. Please update the model map in deepResearcher/utils.ts with this information. ${error}`,
-							...clearedState
-						}
-					}
-					let findingsTokenLimit = modelTokenLimit * 4
-					findings = findings.slice(0, findingsTokenLimit)
-				} else {
-					const findingsTokenLimit = Math.floor(findings.length * 0.9)
-					findings = findings.slice(0, findingsTokenLimit)
-				}
+				findings = findings.slice(
+					0,
+					currentRetry === 0
+						? options.finalReportModel.maxTokens * 4
+						: Math.floor(findings.length * 0.9)
+				)
+
 				console.log('Reducing the chars to', findings.length)
-				currentRetry += 1
 			} else {
-				return {
-					finalReport: `Error generating final report: ${error}`,
-					...clearedState
-				}
+				return new Command({
+					goto: END,
+					update: {
+						finalReport: `Error generating final report: ${error}`
+					}
+				})
 			}
 		}
 	}
 
-	return {
-		finalReport: 'Error generating final report: Maximum retries exceeded',
-		...clearedState
-	}
+	return new Command({
+		goto: END,
+		update: {
+			finalReport:
+				'Error generating final report: Maximum retries exceeded'
+		}
+	})
 }
 
 const deepResearcherGraph = new StateGraph(DeepResearcherAnnotation)
