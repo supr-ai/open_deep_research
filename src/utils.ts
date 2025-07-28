@@ -8,8 +8,10 @@ import {
 	MessageContent
 } from '@langchain/core/messages'
 import { summarizeWebpagePrompt } from './prompts.js'
-import { ResearchCompleteSchema } from './state.js'
+import { ResearchCompleteSchema } from './tools/researchComplete.js'
 import { initChatModel } from 'langchain/chat_models/universal.js'
+import { tavily } from '@tavily/core'
+import createTimeout from './lib/createTimeout.js'
 
 export const messageContentToString = (content: MessageContent) => {
 	// If it’s already a string, just return it
@@ -64,62 +66,22 @@ interface TavilySearchResponse {
 	results: TavilySearchResult[]
 }
 
-export async function tavilySearchAsync(
-	searchQueries: string[],
-	maxResults: number = 5,
-	topic: 'general' | 'news' | 'finance' = 'general',
-	includeRawContent: boolean = true
-): Promise<TavilySearchResponse[]> {
-	const searchTasks = searchQueries.map(
-		async (query): Promise<TavilySearchResponse> => {
-			const response = await fetch('https://api.tavily.com/search', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${process.env.TAVILY_API_KEY!}`
-				},
-				body: JSON.stringify({
-					query,
-					max_results: maxResults,
-					include_raw_content: includeRawContent,
-					topic
-				})
-			})
-
-			if (!response.ok) {
-				throw new Error(`Tavily search failed: ${response.statusText}`)
-			}
-
-			const data = await response.json()
-			return {
-				query,
-				results: data.results || []
-			}
-		}
-	)
-
-	return Promise.all(searchTasks)
-}
-
 export async function summarizeWebpage(
 	model: BaseChatModel,
 	webpageContent: string
 ): Promise<string> {
 	try {
-		const timeoutPromise = new Promise<never>((_, reject) => {
-			setTimeout(() => reject(new Error('Timeout')), 60000)
-		})
-
-		const summaryPromise = model.invoke([
-			new HumanMessage({
-				content: summarizeWebpagePrompt({
-					webpageContent,
-					date: new Date()
+		const summary = await Promise.race([
+			model.invoke([
+				new HumanMessage({
+					content: summarizeWebpagePrompt({
+						webpageContent,
+						date: new Date()
+					})
 				})
-			})
+			]),
+			createTimeout(60000)
 		])
-
-		const summary = await Promise.race([summaryPromise, timeoutPromise])
 
 		// Assuming the model returns a structured Summary object
 		const summaryData = summary.content as any

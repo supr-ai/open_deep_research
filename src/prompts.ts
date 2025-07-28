@@ -27,17 +27,17 @@ If you need to ask a question, follow these guidelines:
 - Don't ask for unnecessary information, or information that the user has already provided. If you can see that the user has already provided the information, do not ask for it again.
 
 Respond in valid JSON format with these exact keys:
-"need_clarification": boolean,
+"needClarification": boolean,
 "question": "<question to ask the user to clarify the report scope>",
 "verification": "<verification message that we will start research>"
 
 If you need to ask a clarifying question, return:
-"need_clarification": true,
+"needClarification": true,
 "question": "<your clarifying question>",
 "verification": ""
 
 If you do not need to ask a clarifying question, return:
-"need_clarification": false,
+"needClarification": false,
 "question": "",
 "verification": "<acknowledgement message that you will now start research based on the provided information>"
 
@@ -347,10 +347,10 @@ Format the report in clear markdown with proper structure and include source ref
 `.trim()
 
 export const summarizeWebpagePrompt = ({
-	webpageContent,
+	content,
 	date = new Date()
 }: {
-	webpageContent: string
+	content: string
 	date?: Date
 }) =>
 	`
@@ -358,9 +358,9 @@ You are tasked with summarizing the raw content of a webpage retrieved from a we
 
 Here is the raw content of the webpage:
 
-<webpage_content>
-${webpageContent}
-</webpage_content>
+<webpageContent>
+${content}
+</webpageContent>
 
 Please follow these guidelines to create your summary:
 
@@ -386,7 +386,7 @@ Present your summary in the following format:
 \`\`\`
 {
    "summary": "Your summary here, structured with appropriate paragraphs or bullet points as needed",
-   "key_excerpts": "First important quote or excerpt, Second important quote or excerpt, Third important quote or excerpt, ...Add more excerpts as needed, up to a maximum of 5"
+   "keyExcerpts": "First important quote or excerpt, Second important quote or excerpt, Third important quote or excerpt, ...Add more excerpts as needed, up to a maximum of 5"
 }
 \`\`\`
 
@@ -396,7 +396,7 @@ Example 1 (for a news article):
 \`\`\`json
 {
    "summary": "On July 15, 2023, NASA successfully launched the Artemis II mission from Kennedy Space Center. This marks the first crewed mission to the Moon since Apollo 17 in 1972. The four-person crew, led by Commander Jane Smith, will orbit the Moon for 10 days before returning to Earth. This mission is a crucial step in NASA's plans to establish a permanent human presence on the Moon by 2030.",
-   "key_excerpts": "Artemis II represents a new era in space exploration, said NASA Administrator John Doe. The mission will test critical systems for future long-duration stays on the Moon, explained Lead Engineer Sarah Johnson. We're not just going back to the Moon, we're going forward to the Moon, Commander Jane Smith stated during the pre-launch press conference."
+   "keyExcerpts": "Artemis II represents a new era in space exploration, said NASA Administrator John Doe. The mission will test critical systems for future long-duration stays on the Moon, explained Lead Engineer Sarah Johnson. We're not just going back to the Moon, we're going forward to the Moon, Commander Jane Smith stated during the pre-launch press conference."
 }
 \`\`\`
 
@@ -404,7 +404,7 @@ Example 2 (for a scientific article):
 \`\`\`json
 {
    "summary": "A new study published in Nature Climate Change reveals that global sea levels are rising faster than previously thought. Researchers analyzed satellite data from 1993 to 2022 and found that the rate of sea-level rise has accelerated by 0.08 mm/year² over the past three decades. This acceleration is primarily attributed to melting ice sheets in Greenland and Antarctica. The study projects that if current trends continue, global sea levels could rise by up to 2 meters by 2100, posing significant risks to coastal communities worldwide.",
-   "key_excerpts": "Our findings indicate a clear acceleration in sea-level rise, which has significant implications for coastal planning and adaptation strategies, lead author Dr. Emily Brown stated. The rate of ice sheet melt in Greenland and Antarctica has tripled since the 1990s, the study reports. Without immediate and substantial reductions in greenhouse gas emissions, we are looking at potentially catastrophic sea-level rise by the end of this century, warned co-author Professor Michael Green."  
+   "keyExcerpts": "Our findings indicate a clear acceleration in sea-level rise, which has significant implications for coastal planning and adaptation strategies, lead author Dr. Emily Brown stated. The rate of ice sheet melt in Greenland and Antarctica has tripled since the 1990s, the study reports. Without immediate and substantial reductions in greenhouse gas emissions, we are looking at potentially catastrophic sea-level rise by the end of this century, warned co-author Professor Michael Green."  
 }
 \`\`\`
 
