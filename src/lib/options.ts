@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { RunnableConfig } from '@langchain/core/runnables'
 import { ModelSchema } from './model.js'
 
-export const ResearchOptionsSchema = z.strictObject({
+export const ResearchOptionsSchema = z.object({
 	maxStructuredOutputRetries: z.number().default(3),
 	allowClarification: z.boolean().default(true),
 	maxConcurrentResearchUnits: z.number().default(5),

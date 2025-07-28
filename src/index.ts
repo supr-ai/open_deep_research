@@ -16,6 +16,7 @@ const runResearch = async (
 }
 
 runResearch(process.argv[2], {
+	allowClarification: false,
 	summarizationModel: {
 		provider: 'openai',
 		name: 'gpt-4.1-nano',
