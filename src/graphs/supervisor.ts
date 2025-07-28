@@ -8,7 +8,7 @@ import {
 import { RunnableConfig } from '@langchain/core/runnables'
 import { StateGraph, END, START, Annotation } from '@langchain/langgraph'
 import { Command } from '@langchain/langgraph'
-import { Configuration } from '../configuration.js'
+import { Configuration } from '../options.js'
 import {
 	ConductResearchSchema,
 	getOverrideValue,

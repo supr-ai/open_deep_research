@@ -360,41 +360,6 @@ function checkGeminiTokenLimit(exception: Error, errorStr: string): boolean {
 	return false
 }
 
-export const MODEL_TOKEN_LIMITS: Record<string, number> = {
-	'openai:gpt-4.1-mini': 1047576,
-	'openai:gpt-4.1-nano': 1047576,
-	'openai:gpt-4.1': 1047576,
-	'openai:gpt-4o-mini': 128000,
-	'openai:gpt-4o': 128000,
-	'openai:o4-mini': 200000,
-	'openai:o3-mini': 200000,
-	'openai:o3': 200000,
-	'openai:o3-pro': 200000,
-	'openai:o1': 200000,
-	'openai:o1-pro': 200000,
-	'anthropic:claude-opus-4': 200000,
-	'anthropic:claude-sonnet-4': 200000,
-	'anthropic:claude-3-7-sonnet': 200000,
-	'anthropic:claude-3-5-sonnet': 200000,
-	'anthropic:claude-3-5-haiku': 200000,
-	'google:gemini-1.5-pro': 2097152,
-	'google:gemini-1.5-flash': 1048576,
-	'google:gemini-pro': 32768,
-	'cohere:command-r-plus': 128000,
-	'cohere:command-r': 128000,
-	'cohere:command-light': 4096,
-	'cohere:command': 4096,
-	'mistral:mistral-large': 32768,
-	'mistral:mistral-medium': 32768,
-	'mistral:mistral-small': 32768,
-	'mistral:mistral-7b-instruct': 32768,
-	'ollama:codellama': 16384,
-	'ollama:llama2:70b': 4096,
-	'ollama:llama2:13b': 4096,
-	'ollama:llama2': 4096,
-	'ollama:mistral': 32768
-}
-
 export function removeUpToLastAIMessage(
 	messages: BaseMessage[]
 ): BaseMessage[] {
