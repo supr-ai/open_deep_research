@@ -20,12 +20,12 @@ import {
 } from '../lib/overrideValue.js'
 import messageContentToString from '../lib/messageContentToString.js'
 import { researchOptionsFromRunnableConfig } from '../lib/options.js'
-import tools, { toolsByName } from '../tools/index.js'
 import { getChatModel } from '../lib/model.js'
 import runToolSafely from '../lib/runToolSafely.js'
 import isTokenLimitExceeded from '../lib/isTokenLimitExceeded.js'
 import removeAfterLastAiMessage from '../lib/removeAfterLastAiMessage.js'
 import researchCompleteTool from '../tools/researchComplete.js'
+import searchTool from '../tools/search.js'
 
 const ResearcherAnnotation = Annotation.Root({
 	researcherMessages: Annotation<BaseMessage[]>({
@@ -60,11 +60,16 @@ type ResearcherNodeHandler = (
 	>
 >
 
+const researcherToolsByName = {
+	[searchTool.name]: searchTool,
+	[researchCompleteTool.name]: researchCompleteTool
+}
+
 const researcher: ResearcherNodeHandler = async (state, config) => {
 	const options = researchOptionsFromRunnableConfig(config)
 
 	const response = await getChatModel(options.researchModel)
-		.bindTools(tools)
+		.bindTools(Object.values(researcherToolsByName))
 		.withRetry({
 			stopAfterAttempt: options.maxStructuredOutputRetries
 		})
@@ -100,7 +105,11 @@ const researcherTools: ResearcherNodeHandler = async (state, config) => {
 
 	const observations = await Promise.all(
 		toolCalls.map(toolCall =>
-			runToolSafely(toolsByName[toolCall.name], toolCall.args, config)
+			runToolSafely(
+				researcherToolsByName[toolCall.name],
+				toolCall.args,
+				config
+			)
 		)
 	)
 
